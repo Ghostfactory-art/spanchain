@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="500" viewBox="0 0 760 500" role="img" aria-label="Hash-chain ledger: each span entry is cryptographically linked to the previous; tampering is detectable">
+  <rect width="760" height="500" fill="#f6f1e3"/>
+
+  <!-- header -->
+  <text x="48" y="44" font-family="JetBrains Mono, ui-monospace, monospace" font-size="14" font-weight="600" letter-spacing="3" fill="#6a6151">HASH-CHAIN LEDGER</text>
+  <text x="48" y="66" font-family="Newsreader, Georgia, serif" font-size="16" font-style="italic" fill="#3a342e">Every entry is linked to the hash of the one before it. Break one — the chain shows it.</text>
+  <line x1="48" y1="82" x2="712" y2="82" stroke="#c8bb96" stroke-width="1"/>
+
+  <!-- chain spine -->
+  <g stroke="#1d1a17" stroke-width="3" stroke-linecap="round">
+    <line x1="88" y1="128" x2="88" y2="224"/>
+    <line x1="88" y1="224" x2="88" y2="320"/>
+  </g>
+  <!-- broken segment between span 03 and span 04 -->
+  <g stroke="#9b2a1f" stroke-width="3" stroke-linecap="round">
+    <line x1="88" y1="320" x2="88" y2="348"/>
+    <line x1="88" y1="392" x2="88" y2="416"/>
+  </g>
+  <path d="M 80 350 L 96 356 L 80 362 L 96 368 L 80 374 L 96 380 L 82 386" fill="none" stroke="#9b2a1f" stroke-width="2.2" stroke-linejoin="round"/>
+
+  <!-- nodes + entries -->
+  <!-- entry 1 -->
+  <g>
+    <circle cx="88" cy="128" r="10" fill="#f6f1e3" stroke="#1d1a17" stroke-width="2.5"/><circle cx="88" cy="128" r="3" fill="#1d1a17"/>
+    <line x1="98" y1="128" x2="132" y2="128" stroke="#1d1a17" stroke-width="2"/>
+    <rect x="132" y="98" width="560" height="60" rx="6" fill="#efe8d0" stroke="#c8bb96" stroke-width="1.2"/>
+    <rect x="132" y="98" width="6" height="60" rx="3" fill="#26516b"/>
+    <text x="152" y="120" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" letter-spacing="1" fill="#8c8270">SPAN 01 &#183; agent.plan</text>
+    <text x="152" y="142" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="600" fill="#26516b">hash 9f2a&#8230;c1d4</text>
+    <text x="420" y="142" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" fill="#6a6151">prev  &#8212; (genesis)</text>
+  </g>
+  <!-- entry 2 -->
+  <g>
+    <circle cx="88" cy="224" r="10" fill="#f6f1e3" stroke="#1d1a17" stroke-width="2.5"/><circle cx="88" cy="224" r="3" fill="#1d1a17"/>
+    <line x1="98" y1="224" x2="132" y2="224" stroke="#1d1a17" stroke-width="2"/>
+    <rect x="132" y="194" width="560" height="60" rx="6" fill="#efe8d0" stroke="#c8bb96" stroke-width="1.2"/>
+    <rect x="132" y="194" width="6" height="60" rx="3" fill="#26516b"/>
+    <text x="152" y="216" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" letter-spacing="1" fill="#8c8270">SPAN 02 &#183; tool.search</text>
+    <text x="152" y="238" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="600" fill="#26516b">hash 3b7e&#8230;a0f9</text>
+    <text x="420" y="238" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" fill="#6a6151">prev  9f2a&#8230;c1d4</text>
+  </g>
+  <!-- entry 3 -->
+  <g>
+    <circle cx="88" cy="320" r="10" fill="#f6f1e3" stroke="#1d1a17" stroke-width="2.5"/><circle cx="88" cy="320" r="3" fill="#1d1a17"/>
+    <line x1="98" y1="320" x2="132" y2="320" stroke="#1d1a17" stroke-width="2"/>
+    <rect x="132" y="290" width="560" height="60" rx="6" fill="#efe8d0" stroke="#c8bb96" stroke-width="1.2"/>
+    <rect x="132" y="290" width="6" height="60" rx="3" fill="#26516b"/>
+    <text x="152" y="312" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" letter-spacing="1" fill="#8c8270">SPAN 03 &#183; llm.call</text>
+    <text x="152" y="334" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="600" fill="#26516b">hash c84d&#8230;7b22</text>
+    <text x="420" y="334" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" fill="#6a6151">prev  3b7e&#8230;a0f9</text>
+  </g>
+  <!-- entry 4: tampered -->
+  <g>
+    <circle cx="88" cy="416" r="10" fill="#f6f1e3" stroke="#9b2a1f" stroke-width="2.5"/><circle cx="88" cy="416" r="3" fill="#9b2a1f"/>
+    <line x1="98" y1="416" x2="132" y2="416" stroke="#9b2a1f" stroke-width="2"/>
+    <rect x="132" y="386" width="560" height="60" rx="6" fill="#efe8d0" stroke="#9b2a1f" stroke-width="1.6"/>
+    <rect x="132" y="386" width="6" height="60" rx="3" fill="#9b2a1f"/>
+    <text x="152" y="408" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" letter-spacing="1" fill="#8c8270">SPAN 04 &#183; agent.reply</text>
+    <text x="152" y="430" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="600" fill="#9b2a1f">hash 1a55&#8230;ff03</text>
+    <text x="420" y="430" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" fill="#9b2a1f">prev  0000&#8230;dead &#8800;</text>
+  </g>
+
+  <!-- tamper stamp -->
+  <g transform="translate(360,360) rotate(-9)" opacity="0.9">
+    <rect x="-66" y="-18" width="132" height="36" rx="5" fill="none" stroke="#9b2a1f" stroke-width="2.5"/>
+    <text x="0" y="6" text-anchor="middle" fill="#9b2a1f" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="700" letter-spacing="2">HASH MISMATCH</text>
+  </g>
+</svg>

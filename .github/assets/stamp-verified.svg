@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-label="Verified stamp">
+  <g transform="translate(80,80) rotate(-8)" fill="none" stroke="#4a7a3a" opacity="0.92">
+    <circle r="62" stroke-width="3.5"/>
+    <circle r="52" stroke-width="1.5" stroke-dasharray="3 4"/>
+    <text x="0" y="-22" text-anchor="middle" stroke="none" fill="#4a7a3a" font-family="JetBrains Mono, ui-monospace, monospace" font-size="15" font-weight="700" letter-spacing="2">VERIFIED</text>
+    <path d="M -20 8 L -5 24 L 26 -14" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="0" y="46" text-anchor="middle" stroke="none" fill="#4a7a3a" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" font-weight="600" letter-spacing="3">SPAN CHAIN</text>
+  </g>
+</svg>

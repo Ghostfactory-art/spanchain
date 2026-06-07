@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="380" viewBox="0 0 980 380" role="img" aria-label="Span Chain architecture: SDK emits OTLP or JSON, the backend builds a hash-chain ledger that powers replay, evals and audit">
+  <defs>
+    <marker id="ar" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#7ec8ff"/></marker>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0 L0 0 0 40" fill="none" stroke="#1f4d6a" stroke-width="1" opacity="0.45"/>
+    </pattern>
+  </defs>
+
+  <rect width="980" height="380" fill="#0e3147"/>
+  <rect width="980" height="380" fill="url(#grid)"/>
+
+  <text x="40" y="44" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="600" letter-spacing="3" fill="#7ea5b8">ARCHITECTURE &#183; DATA FLOW</text>
+  <line x1="40" y1="56" x2="940" y2="56" stroke="#2a6383" stroke-width="1"/>
+
+  <!-- SDK -->
+  <g>
+    <rect x="40" y="150" width="160" height="86" rx="8" fill="#143e58" stroke="#7ec8ff" stroke-width="1.6"/>
+    <text x="120" y="186" text-anchor="middle" font-family="Inter Tight, system-ui, sans-serif" font-size="20" font-weight="600" fill="#cfe3f0">SDK</text>
+    <text x="120" y="210" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#7ea5b8">OTLP / JSON</text>
+  </g>
+  <line x1="200" y1="193" x2="252" y2="193" stroke="#7ec8ff" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- Ingest -->
+  <g>
+    <rect x="262" y="150" width="160" height="86" rx="8" fill="#143e58" stroke="#7ec8ff" stroke-width="1.6"/>
+    <text x="342" y="186" text-anchor="middle" font-family="Inter Tight, system-ui, sans-serif" font-size="20" font-weight="600" fill="#cfe3f0">Ingest</text>
+    <text x="342" y="210" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#7ea5b8">normalize &#183; span tree</text>
+  </g>
+  <line x1="422" y1="193" x2="474" y2="193" stroke="#7ec8ff" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- Ledger (highlight) -->
+  <g>
+    <rect x="484" y="126" width="184" height="134" rx="10" fill="#0a2638" stroke="#7ec8ff" stroke-width="2.4"/>
+    <rect x="484" y="126" width="184" height="30" rx="10" fill="#7ec8ff" opacity="0.12"/>
+    <text x="576" y="158" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" letter-spacing="2" fill="#7ec8ff">SOURCE OF TRUTH</text>
+    <text x="576" y="192" text-anchor="middle" font-family="Inter Tight, system-ui, sans-serif" font-size="21" font-weight="700" fill="#cfe3f0">Hash-Chain</text>
+    <text x="576" y="216" text-anchor="middle" font-family="Inter Tight, system-ui, sans-serif" font-size="21" font-weight="700" fill="#cfe3f0">Ledger</text>
+    <text x="576" y="242" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#7ea5b8">append-only &#183; tamper-evident</text>
+  </g>
+
+  <!-- fan out -->
+  <line x1="668" y1="193" x2="724" y2="103" stroke="#7ec8ff" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="668" y1="193" x2="724" y2="193" stroke="#7ec8ff" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="668" y1="193" x2="724" y2="283" stroke="#7ec8ff" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- outputs -->
+  <g font-family="Inter Tight, system-ui, sans-serif" font-size="17" font-weight="600" fill="#cfe3f0">
+    <rect x="734" y="74" width="180" height="58" rx="8" fill="#143e58" stroke="#3a8ec4" stroke-width="1.4"/>
+    <text x="824" y="100" text-anchor="middle">Deterministic Replay</text>
+    <text x="824" y="120" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" font-weight="400" fill="#7ea5b8">same in &#8594; same chain</text>
+
+    <rect x="734" y="164" width="180" height="58" rx="8" fill="#143e58" stroke="#3a8ec4" stroke-width="1.4"/>
+    <text x="824" y="190" text-anchor="middle">Evals &amp; Compare</text>
+    <text x="824" y="210" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" font-weight="400" fill="#7ea5b8">diff N runs side by side</text>
+
+    <rect x="734" y="254" width="180" height="58" rx="8" fill="#143e58" stroke="#3a8ec4" stroke-width="1.4"/>
+    <text x="824" y="280" text-anchor="middle">Audit Trail</text>
+    <text x="824" y="300" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" font-weight="400" fill="#7ea5b8">browsable &#183; tamper-evident</text>
+  </g>
+
+  <text x="40" y="352" font-family="Newsreader, Georgia, serif" font-size="16" font-style="italic" fill="#7ea5b8">The SDK stays dumb. The backend does the work &#8212; and proves it.</text>
+</svg>

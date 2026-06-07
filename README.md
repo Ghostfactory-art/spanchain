@@ -1,17 +1,111 @@
-# Span Chain
+<p align="center">
+  <img src=".github/assets/banner.svg" alt="Span Chain — deterministic replay for AI agents" width="900">
+</p>
 
-> Every agent leaves a record. We keep it.
+<p align="center">
+  <em>Every agent leaves a record.&nbsp; We keep it.</em>
+</p>
 
-Tamper-evident audit trail for production AI agents.
-SHA-256 hash-chain. Append-only. Cryptographically verifiable.
+<p align="center">
+  <img src=".github/assets/badges.svg" alt="status · license · ingest · replay" width="620">
+</p>
+
+---
+
+Span Chain treats the **agent session** as the unit of analysis — not the individual LLM call.
+The entire run, with its parent/child span hierarchy intact, is recorded to an
+**immutable, hash-chain–verified ledger** as the source of truth.
+
+Re-run a recorded session and you get the **same chain every time**.
+Silent failures — HTTP 200, wrong answer — become inspectable instead of irreproducible.
+
+---
+
+## How it works
+
+<p align="center">
+  <img src=".github/assets/hash-chain.svg" alt="Hash-chain ledger" width="700">
+</p>
+
+Each entry in the ledger contains a SHA-256 hash of the previous entry.
+Tampered records and dropped epochs are **detectable**, not assumed away.
+
+---
+
+## Properties
+
+<table align="center">
+  <tr>
+    <td align="center" width="260">
+      <img src=".github/assets/stamp-verified.svg" width="110"><br>
+      <b>Verified</b><br>
+      <sub>Every entry cryptographically linked to the last</sub>
+    </td>
+    <td align="center" width="260">
+      <img src=".github/assets/stamp-deterministic.svg" width="125"><br>
+      <b>Deterministic Replay</b><br>
+      <sub>Same session → identical chain, always</sub>
+    </td>
+    <td align="center" width="260">
+      <img src=".github/assets/stamp-tamper.svg" width="115"><br>
+      <b>Tamper Detection</b><br>
+      <sub>Dropped epochs and mutations surface automatically</sub>
+    </td>
+  </tr>
+</table>
+
+---
+
+## Architecture
+
+<p align="center">
+  <img src=".github/assets/architecture.svg" alt="Span Chain architecture" width="860">
+</p>
+
+```
+SDK (OTLP / JSON)
+  → Ingest  (normalize, span tree)
+    → Hash-Chain Ledger  (source of truth · immutable · verifiable)
+      ├── Deterministic Replay
+      ├── Evals & Compare
+      └── Audit Trail
+```
+
+---
 
 ## Quickstart
 
+Requires Docker Compose v2.
+
 ```bash
-git clone https://github.com/ghostfactory-art/spanchain
+git clone https://github.com/ghostfactory-art/spanchain.git
 cd spanchain
 docker compose up
-# → http://localhost:4001
 ```
 
-See [docs/development.md](docs/development.md) for full setup, SDK examples, and curl recipes.
+Backend at `:4000` · UI at `:4001`
+
+**Send a trace (OTLP/HTTP JSON):**
+
+```bash
+curl -X POST http://localhost:4000/v1/traces \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $SPANCHAIN_KEY" \
+  -d @your-trace.json
+```
+
+Or use the plain JSON endpoint at `/ingest` — no OTLP SDK required.
+
+---
+
+## Status
+
+Active development · launching soon.
+
+A **[GhostFactory](https://ghostfactory.art)** product — [spanchain.art](https://spanchain.art)
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).

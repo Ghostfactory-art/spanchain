@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="160" viewBox="0 0 180 160" role="img" aria-label="Deterministic replay stamp">
+  <g transform="translate(90,80) rotate(-7)" fill="none" stroke="#26516b" opacity="0.92">
+    <rect x="-78" y="-34" width="156" height="68" rx="6" stroke-width="3.5"/>
+    <rect x="-71" y="-27" width="142" height="54" rx="3" stroke-width="1.2" stroke-dasharray="3 4"/>
+    <text x="0" y="-4" text-anchor="middle" stroke="none" fill="#26516b" font-family="JetBrains Mono, ui-monospace, monospace" font-size="17" font-weight="700" letter-spacing="1">DETERMINISTIC</text>
+    <text x="0" y="18" text-anchor="middle" stroke="none" fill="#26516b" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" font-weight="600" letter-spacing="6">REPLAY</text>
+  </g>
+</svg>

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Span Chain — social card</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Newsreader:ital@1&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:1200px;height:630px;overflow:hidden}
+  :root{
+    --paper:#f6f1e3;--paper-2:#efe8d0;--ink:#1d1a17;--ink-2:#3a342e;
+    --mute:#6a6151;--mute-2:#8c8270;--rule:#c8bb96;--rule-strong:#a89a72;
+    --stamp-red:#9b2a1f;--sig-blue:#26516b;--accent:#d97757;--green:#4a7a3a;--amber:#c98a2b;
+    --mono:'JetBrains Mono',ui-monospace,monospace;--sans:'Inter Tight',system-ui,sans-serif;--serif:'Newsreader',Georgia,serif;
+  }
+  .og{position:relative;width:1200px;height:630px;background:var(--paper);
+      padding:80px 90px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+  /* ledger rulings */
+  .og::before{content:"";position:absolute;left:0;right:0;top:150px;border-top:1px solid var(--rule);opacity:.55}
+  .og::after{content:"";position:absolute;left:0;right:0;bottom:150px;border-top:1px solid var(--rule);opacity:.55}
+  .margin{position:absolute;left:60px;top:0;bottom:0;border-left:1.5px solid #d0c595;opacity:.7}
+  .base{position:absolute;left:0;bottom:0;width:100%;height:8px;background:var(--stamp-red)}
+
+  .top{display:flex;align-items:center;gap:34px;position:relative;z-index:2}
+  .wm .eyebrow{font-family:var(--mono);font-size:18px;font-weight:500;letter-spacing:5px;color:var(--mute)}
+  .wm .name{font-family:var(--sans);font-size:88px;font-weight:600;letter-spacing:-3px;color:var(--ink);line-height:.95;margin-top:6px}
+  .rule{width:96px;height:6px;border-radius:3px;background:var(--accent);margin-top:14px}
+
+  .hook{position:relative;z-index:2;font-family:var(--serif);font-style:italic;font-size:40px;color:var(--ink-2);line-height:1.25;max-width:880px}
+  .hook b{color:var(--stamp-red);font-style:normal;font-weight:600}
+
+  .bottom{position:relative;z-index:2}
+  .chips{display:flex;gap:14px;align-items:center;margin-bottom:22px}
+  .ck{font-family:var(--mono);font-size:20px;font-weight:600;color:var(--paper);padding:9px 20px;border-radius:7px;white-space:nowrap}
+  .url{font-family:var(--mono);font-size:20px;letter-spacing:2px;color:var(--mute)}
+  .url b{color:var(--ink)}
+
+  /* rubber stamp */
+  .seal{position:absolute;right:96px;top:120px;width:170px;height:170px;transform:rotate(-9deg);opacity:.22;z-index:1}
+</style>
+</head>
+<body>
+<div class="og">
+  <div class="margin"></div>
+
+  <!-- verified stamp -->
+  <svg class="seal" viewBox="0 0 160 160">
+    <g transform="translate(80,80)" fill="none" stroke="#9b2a1f">
+      <circle r="62" stroke-width="3.5"/>
+      <circle r="52" stroke-width="1.5" stroke-dasharray="3 4"/>
+      <text x="0" y="-22" text-anchor="middle" stroke="none" fill="#9b2a1f" font-family="JetBrains Mono,monospace" font-size="15" font-weight="700" letter-spacing="2">VERIFIED</text>
+      <path d="M -20 8 L -5 24 L 26 -14" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="0" y="46" text-anchor="middle" stroke="none" fill="#9b2a1f" font-family="JetBrains Mono,monospace" font-size="9" font-weight="600" letter-spacing="3">SPAN CHAIN</text>
+    </g>
+  </svg>
+
+  <div>
+    <div class="top">
+      <svg width="150" height="150" viewBox="0 0 80 80" aria-label="Span Chain mark">
+        <defs>
+          <mask id="og0"><rect width="80" height="80" fill="#fff"/><circle cx="14" cy="61" r="2.8"/></mask>
+          <mask id="og1"><rect width="80" height="80" fill="#fff"/><circle cx="42" cy="46" r="2.8"/></mask>
+          <mask id="og2"><rect width="80" height="80" fill="#fff"/><circle cx="36" cy="31" r="2.8"/></mask>
+          <mask id="og3"><rect width="80" height="80" fill="#fff"/><circle cx="64" cy="16" r="2.8"/></mask>
+        </defs>
+        <rect x="6" y="56" width="46" height="10" rx="5" fill="#1d1a17" mask="url(#og0)"/>
+        <rect x="28" y="41" width="46" height="10" rx="5" fill="#1d1a17" mask="url(#og1)"/>
+        <rect x="6" y="26" width="46" height="10" rx="5" fill="#1d1a17" mask="url(#og2)"/>
+        <rect x="28" y="11" width="46" height="10" rx="5" fill="#1d1a17" mask="url(#og3)"/>
+      </svg>
+      <div class="wm">
+        <div class="eyebrow">A GHOSTFACTORY PRODUCT</div>
+        <div class="name">Span Chain</div>
+        <div class="rule"></div>
+      </div>
+    </div>
+    <div class="hook" style="margin-top:38px">When an agent fails silently &mdash; HTTP&nbsp;200, wrong answer &mdash; you need a <b>tamper-evident audit trail.</b></div>
+  </div>
+
+  <div class="bottom">
+    <div class="chips">
+      <span class="ck" style="background:#26516b">Replay</span>
+      <span class="ck" style="background:#1d1a17">Ledger</span>
+      <span class="ck" style="background:#4a7a3a">Evals</span>
+      <span class="ck" style="background:#9b2a1f">Audit</span>
+      <span class="ck" style="background:#c98a2b;color:#1d1a17">OTel-native</span>
+    </div>
+    <div class="url">A <b>GhostFactory</b> product &nbsp;&#183;&nbsp; <b>spanchain.art</b></div>
+  </div>
+
+  <div class="base"></div>
+</div>
+</body>
+</html>

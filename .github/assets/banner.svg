@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="300" viewBox="0 0 1040 300" role="img" aria-label="Span Chain — deterministic replay for AI agents, a GhostFactory product">
+  <defs>
+    <mask id="bn-m0"><rect width="80" height="80" fill="white"/><circle cx="14" cy="61" r="2.8" fill="black"/></mask>
+    <mask id="bn-m1"><rect width="80" height="80" fill="white"/><circle cx="42" cy="46" r="2.8" fill="black"/></mask>
+    <mask id="bn-m2"><rect width="80" height="80" fill="white"/><circle cx="36" cy="31" r="2.8" fill="black"/></mask>
+    <mask id="bn-m3"><rect width="80" height="80" fill="white"/><circle cx="64" cy="16" r="2.8" fill="black"/></mask>
+  </defs>
+
+  <!-- paper -->
+  <rect width="1040" height="300" fill="#f6f1e3"/>
+  <!-- ledger ruling, faint -->
+  <g stroke="#c8bb96" stroke-width="1" opacity="0.55">
+    <line x1="0" y1="74" x2="1040" y2="74"/>
+    <line x1="0" y1="226" x2="1040" y2="226"/>
+  </g>
+  <!-- left margin rule (archival sheet) -->
+  <line x1="48" y1="0" x2="48" y2="300" stroke="#d0c595" stroke-width="1.5" opacity="0.7"/>
+
+  <!-- rubber-stamp seal, top-right, distressed -->
+  <g transform="translate(905,92) rotate(-9)" opacity="0.22">
+    <circle r="58" fill="none" stroke="#9b2a1f" stroke-width="3"/>
+    <circle r="48" fill="none" stroke="#9b2a1f" stroke-width="1.5" stroke-dasharray="3 4"/>
+    <text x="0" y="-14" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="700" letter-spacing="2" fill="#9b2a1f">VERIFIED</text>
+    <path d="M -16 6 L -4 18 L 20 -10" fill="none" stroke="#9b2a1f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="0" y="40" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="8" font-weight="600" letter-spacing="3" fill="#9b2a1f">SPAN CHAIN</text>
+  </g>
+
+  <!-- mark (staircase hash-chain) -->
+  <g transform="translate(74,54) scale(1.55)">
+    <rect x="6" y="56" width="46" height="10" rx="5" fill="#1d1a17" mask="url(#bn-m0)"/>
+    <rect x="28" y="41" width="46" height="10" rx="5" fill="#1d1a17" mask="url(#bn-m1)"/>
+    <rect x="6" y="26" width="46" height="10" rx="5" fill="#1d1a17" mask="url(#bn-m2)"/>
+    <rect x="28" y="11" width="46" height="10" rx="5" fill="#1d1a17" mask="url(#bn-m3)"/>
+  </g>
+
+  <!-- wordmark block -->
+  <text x="238" y="108" font-family="JetBrains Mono, ui-monospace, monospace" font-size="14" font-weight="500" letter-spacing="4" fill="#6a6151">A GHOSTFACTORY PRODUCT</text>
+  <text x="236" y="170" font-family="Inter Tight, system-ui, sans-serif" font-size="66" font-weight="600" letter-spacing="-2" fill="#1d1a17">Span Chain</text>
+  <rect x="240" y="186" width="78" height="5" rx="2.5" fill="#d97757"/>
+  <text x="240" y="218" font-family="Newsreader, Georgia, serif" font-size="23" font-style="italic" fill="#3a342e">Tamper-evident audit trail for production AI agents.</text>
+  <text x="240" y="256" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="500" letter-spacing="3" fill="#8c8270">REPLAY &#183; LEDGER &#183; EVALS &#183; AUDIT &#183; OTEL-NATIVE</text>
+
+  <!-- filed tab, bottom -->
+  <rect x="0" y="294" width="1040" height="6" fill="#9b2a1f"/>
+</svg>
