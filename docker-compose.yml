@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      # GF-858: user/db explicit so they can't drift from DATABASE_URL (app service).
+      # POSTGRES_PASSWORD stays an env ref (no hardcoded secret — GF-842); supply it via
+      # inline `POSTGRES_PASSWORD=… docker compose up` or `--env-file .env.docker`, never the
+      # dev .env (protected; GF-783).
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: span_chain_prod
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "wal_buffers=16MB"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build: .
+    # GF-769: no host ports — the app is reachable only inside the Docker network;
+    # Caddy is the sole external gateway (TLS termination on :443).
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/span_chain_prod
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      GF_API_KEY: ${GF_API_KEY}
+      BATCH_FLUSH_TIMEOUT_MS: ${BATCH_FLUSH_TIMEOUT_MS:-100}
+      POOL_SIZE: ${POOL_SIZE:-10}
+      PHX_HOST: ${PHX_HOST:-localhost}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # GF-769: reverse proxy + automatic TLS. Unifies the two app listeners behind one
+  # HTTPS gateway (local CA for DOMAIN=localhost, Let's Encrypt for a real domain).
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"      # ACME HTTP-01 challenge + HTTP→HTTPS redirect
+      - "443:443"
+    environment:
+      # Consumed by {$DOMAIN:localhost} in the Caddyfile (read inside the Caddy container).
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data       # issued certs survive restart → avoids Let's Encrypt rate limits
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,22 @@
+# GF-769 — single HTTPS gateway in front of the two app listeners. Caddy terminates
+# TLS (local CA for DOMAIN=localhost, Let's Encrypt for a real domain) and path-routes
+# to the app's internal ports; the app binds no host ports (Docker network only).
+{$DOMAIN:localhost} {
+    # Ingestion + telemetry → Bandit (4000). Use `handle` — the prefix-stripping
+    # directive would forward `/` to the app instead of /ingest… or /v1/traces;
+    # `handle` preserves the full request path.
+    handle /ingest* {
+        reverse_proxy app:4000
+    }
+    handle /v1/traces* {
+        reverse_proxy app:4000
+    }
+    handle /health* {
+        reverse_proxy app:4000
+    }
+
+    # Everything else (Web shell, /api JSON scope, LiveView /trail, static assets) → Phoenix (4001).
+    handle {
+        reverse_proxy app:4001
+    }
+}

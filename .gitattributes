@@ -1,0 +1,8 @@
+# GF-783: shell scripts and the Docker entrypoint MUST stay LF — a CRLF checkout
+# (Windows autocrlf) bakes `#!/bin/sh\r` into the image and the container fails to
+# start ("no such file or directory"). Pin line endings for the self-hosting files.
+*.sh text eol=lf
+entrypoint.sh text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+.dockerignore text eol=lf

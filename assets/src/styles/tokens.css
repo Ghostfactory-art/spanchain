@@ -1,0 +1,76 @@
+/* ============================================================================
+   GhostFactory — Design Tokens (Records Bureau)
+   ----------------------------------------------------------------------------
+   Single source of truth for the brand palette + typography. Link this file
+   BEFORE any page's inline <style> so component CSS can consume the var()s.
+
+   Used by:  public/index.html (brand HP), public/span-chain-app.html (tool),
+             priv/static/index.html (live-served tool, GF-791).
+   Drop-in:  <link rel="stylesheet" href="tokens.css">
+
+   Every value below is the reconciled union of the previously-duplicated
+   inline :root blocks; shared values were already byte-identical, so this is
+   a lossless extraction.
+   ========================================================================= */
+:root{
+  /* ---- Surface · paper (both HP + tool) ---------------------------------- */
+  --paper:#f6f1e3;
+  --paper-2:#efe8d0;
+  --paper-3:#e6dcb8;
+  --paper-edge:#d0c595;
+
+  /* ---- Surface · desk (app only) ----------------------------------------- */
+  /* The darker workspace the tool's paper cards float on. The marketing HP
+     stays flat --paper; the app reads as a desk with records laid out. */
+  --desk:#d9cda6;
+  --desk-2:#cfc198;
+
+  /* ---- Ink · text -------------------------------------------------------- */
+  --ink:#1d1a17;
+  --ink-2:#3a342e;
+  --mute:#6a6151;
+  --mute-2:#8c8270;
+
+  /* ---- Rules · borders --------------------------------------------------- */
+  --rule:#c8bb96;
+  --rule-strong:#a89a72;
+
+  /* ---- Stamp · red (error state + rubber-stamp seals) -------------------- */
+  --stamp-red:#9b2a1f;
+  --stamp-red-2:#7a1f15;
+
+  /* ---- Signature · blue (replay / metadata / date-stamps) ---------------- */
+  --sig-blue:#26516b;
+  --sig-blue-2:#1a3a52;
+
+  /* ---- Blueprint · navy theme (engineering / wireframe panels) ----------- */
+  --blueprint:#0e3147;
+  --blueprint-2:#0a2638;
+  --blueprint-3:#143e58;
+  --cyan:#7ec8ff;
+  --cyan-d:#3a8ec4;
+  --print-paper:#cfe3f0;   /* text on blueprint */
+  --print-mute:#7ea5b8;    /* muted text on blueprint */
+  --print-rule:#1f4d6a;
+  --print-rule-2:#2a6383;
+
+  /* ---- Accent ------------------------------------------------------------ */
+  --accent:#d97757;
+
+  /* ---- Status ------------------------------------------------------------ */
+  --green:#4a7a3a;          /* verified / ok */
+  --green-bright:#7fcf5f;   /* live ok highlight (app) */
+  --amber:#c98a2b;          /* warn (app) */
+
+  /* ---- Layout ------------------------------------------------------------ */
+  --max:1320px;
+
+  /* ---- Typography · font stacks ------------------------------------------ */
+  /* Promote the previously-hardcoded font-family strings to tokens so a
+     family swap is a one-line edit. Components may still use literal stacks;
+     these are the canonical references. */
+  --font-serif:'Newsreader',Georgia,serif;
+  --font-sans:'Inter Tight',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  --font-script:'Caveat',cursive;
+}

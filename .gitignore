@@ -1,0 +1,39 @@
+# The directory Mix will write compiled artifacts to.
+/_build/
+
+# If you run "mix test --cover", coverage assets end up here.
+/cover/
+
+# The directory Mix downloads your dependencies sources to.
+/deps/
+
+# Where third-party dependencies like ExDoc output generated docs.
+/doc/
+
+# Temporary files, for example, from tests.
+/tmp/
+
+# If the VM crashes, it generates a dump, let's ignore it too.
+erl_crash.dump
+
+# Also ignore archive artifacts (built via "mix archive.build").
+*.ez
+
+# Ignore package tarball (built via "mix hex.build").
+gf_experiment-*.tar
+
+# Auto-generated Obsidian wikilinks graph (mix docs.graph)
+docs/graph/
+
+# Environment files / secrets (GF-771; GF-842: .env.* glob + prod.secret.exs)
+.env
+.env.*
+!.env.example
+*.secret
+config/prod.secret.exs
+
+# Vite build output — generated via `mix assets.deploy`, not committed (GF-796/801)
+/priv/static/app.js
+/priv/static/app.css
+/priv/static/index.html
+

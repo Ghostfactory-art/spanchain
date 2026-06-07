@@ -1,0 +1,27 @@
+# Build artifacts
+_build/
+deps/
+.mix/
+
+# Node
+node_modules/
+assets/node_modules/
+
+# Rebuilt inside container (mix assets.deploy)
+priv/static/
+
+# Secrets — never in image
+.env
+.env.*
+.envrc
+
+# Dev/test only
+test/
+cover/
+doc/
+logs/
+*.md
+
+# VCS
+.git/
+.gitignore
