@@ -75,26 +75,28 @@ SDK (OTLP / JSON)
 
 ## Quickstart
 
-Requires Docker Compose v2.
+Requires Docker Compose v2 and a `.env` file:
 
 ```bash
 git clone https://github.com/ghostfactory-art/spanchain.git
 cd spanchain
+cp .env.example .env
+# Edit .env — set POSTGRES_PASSWORD, GF_API_KEY, and SECRET_KEY_BASE
 docker compose up
 ```
 
-Backend at `:4000` · UI at `:4001`
+UI at **http://localhost** · Ingest API at **http://localhost/ingest**
 
 **Send a trace (OTLP/HTTP JSON):**
 
 ```bash
-curl -X POST http://localhost:4000/v1/traces \
+curl -X POST http://localhost/v1/traces \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $SPANCHAIN_KEY" \
   -d @your-trace.json
 ```
 
-Or use the plain JSON endpoint at `/ingest` — no OTLP SDK required.
+Or use the plain JSON endpoint at `http://localhost/ingest` — no OTLP SDK required.
 
 ---
 
@@ -103,6 +105,17 @@ Or use the plain JSON endpoint at `/ingest` — no OTLP SDK required.
 Active development · launching soon.
 
 A **[GhostFactory](https://ghostfactory.art)** product — [spanchain.art](https://spanchain.art)
+
+---
+
+## Known Issues
+
+**Windows (WSL2):** Line endings in `entrypoint.sh` — if the container exits with
+`exec format error`, run `dos2unix entrypoint.sh` before building.
+
+**macOS (Apple Silicon):** Untested. Should work via Docker Desktop ARM emulation.
+
+**Linux:** Untested. Standard `docker compose up` expected to work.
 
 ---
 
