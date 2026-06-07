@@ -303,6 +303,20 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
 .ink-in{stroke-dasharray:300;stroke-dashoffset:300;transition:stroke-dashoffset 1.6s ease-out}
 .ink-in.ink-go{stroke-dashoffset:0}
 
+/* -- FIELD REPORT GF-872 -- */
+.stats-row{margin-top:54px;display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--rule);border-radius:2px;overflow:hidden}
+.stat-box{padding:36px 24px 30px;border-right:1px solid var(--rule);background:linear-gradient(180deg,#fbf6e6 0%,var(--paper) 100%);text-align:center;position:relative;transition:background .2s}
+.stat-box:last-child{border-right:none}
+.stat-box--accent{background:linear-gradient(180deg,rgba(155,42,31,.05) 0%,var(--paper) 100%)}
+.stat-num{font-family:'JetBrains Mono',monospace;font-size:clamp(36px,4.4vw,58px);font-weight:700;color:var(--ink);line-height:1;letter-spacing:-0.02em;margin-bottom:8px}
+.stat-box--accent .stat-num{color:var(--stamp-red)}
+.stat-lbl{font-family:'Inter Tight',sans-serif;font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.18em;font-weight:500}
+.verify-row{margin-top:14px;display:flex;align-items:center;gap:16px;padding:14px 20px;background:var(--paper-2);border:1px solid var(--rule);border-radius:2px;flex-wrap:wrap}
+.verify-cmd{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink);font-weight:600;white-space:nowrap;padding-right:16px;border-right:1px solid var(--rule-strong)}
+.verify-result{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--sig-blue);flex:1;min-width:0;letter-spacing:.02em}
+@media(max-width:760px){.stats-row{grid-template-columns:1fr 1fr}.stat-box:nth-child(2n){border-right:none}.stat-box{border-bottom:1px solid var(--rule)}.stat-box:nth-last-child(-n+2){border-bottom:none}}
+@media(max-width:460px){.stats-row{grid-template-columns:1fr}.stat-box{border-right:none!important;border-bottom:1px solid var(--rule)!important}.stat-box:last-child{border-bottom:none!important}}
+
 </style>
 </head>
 <body>
@@ -814,6 +828,45 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
         <span class="step-stamp">VCR · structural diff</span>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- -- FIELD REPORT GF-872 -- -->
+<section id="field-report" style="padding:80px 0">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="section-tag">Field report · GF-872</div>
+        <h2>10,000 spans.<br><em>Zero</em> corrupted.</h2>
+      </div>
+      <p class="section-lede">Self-hosted OTP stress test: 1,000 concurrent agents, 17.5 seconds. Every run in its own isolated process — a crash in one doesn't touch the others. <code>verify_ledger</code>: 0 corrupted.</p>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-num">1,000</div>
+        <div class="stat-lbl">concurrent agents</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">10,000</div>
+        <div class="stat-lbl">spans total</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">571</div>
+        <div class="stat-lbl">spans / sec</div>
+      </div>
+      <div class="stat-box stat-box--accent">
+        <div class="stat-num">0</div>
+        <div class="stat-lbl">corrupted</div>
+      </div>
+    </div>
+
+    <div class="verify-row">
+      <span class="verify-cmd">$ verify_ledger</span>
+      <span class="verify-result">Chain integrity: OK · 20/20 sampled · 0 corrupted · Zero LLM calls</span>
+      <div class="doss-stamp-mini red" style="flex-shrink:0">Verified</div>
+    </div>
+    <p style="margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--mute);letter-spacing:.06em">GF-872 · 2026-06-07 · Python asyncio / httpx · 1,000 coroutines · Elixir/OTP 28 · Bandit · self-hosted</p>
   </div>
 </section>
 
