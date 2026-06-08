@@ -100,6 +100,27 @@ Or use the plain JSON endpoint at `http://localhost/ingest` — no OTLP SDK requ
 
 ---
 
+## SDKs
+
+Both SDKs ship in this repo and speak OTLP/HTTP JSON natively.
+
+**Python:**
+
+```bash
+pip install ./sdk/python
+```
+
+**TypeScript:**
+
+```bash
+npm install ./sdk/typescript
+```
+
+Usage examples in [`sdk/python/README.md`](sdk/python/README.md) and
+[`sdk/typescript/README.md`](sdk/typescript/README.md).
+
+---
+
 ## Status
 
 Active development · launching soon.
@@ -109,6 +130,19 @@ A **[GhostFactory](https://ghostfactory.art)** product — [spanchain.art](https
 ---
 
 ## Known Issues
+
+**TLS certificate (localhost):** With the default `DOMAIN=localhost`, Caddy terminates HTTPS
+using its own local CA, so on first run your browser shows an SSL warning and `curl` fails with
+a certificate error. Trust the local CA once:
+
+```bash
+docker compose exec caddy caddy trust
+```
+
+Restart the browser afterwards (on Windows/Docker Desktop this is usually required; on WSL2 you can
+confirm the cert landed in `/etc/ssl/certs/`). To skip trusting, bypass per-request instead —
+`curl --insecure` or click through the browser's "advanced" warning. Not needed when `DOMAIN` is a
+real domain (Caddy uses Let's Encrypt).
 
 **Windows (WSL2):** Line endings in `entrypoint.sh` — if the container exits with
 `exec format error`, run `dos2unix entrypoint.sh` before building.

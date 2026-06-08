@@ -17,11 +17,11 @@ if config_env() == :test do
   config :span_chain, SpanChain.Repo, password: Dotenvy.env!("PGPASSWORD", :string, "postgres")
 end
 
-# GF-777: batch_timeout laditelný env varem BATCH_FLUSH_TIMEOUT_MS, default 100ms.
-# Test env ZÁMĚRNĚ nepřebíjíme — seam `broadway_batch_timeout_ms: 50` v
-# config/test.exs musí zůstat efektivní (GF-780: epoch_drain_timeout_ms 100ms >
-# batch_timeout; rovnost/inverze vrací chain_broken race). runtime.exs běží PO
-# compile-time configu, takže unguarded set by 50ms seam přepsal.
+# GF-777: batch_timeout is tunable via the BATCH_FLUSH_TIMEOUT_MS env var, default 100ms.
+# We INTENTIONALLY do not override the test env — the seam `broadway_batch_timeout_ms: 50`
+# in config/test.exs must stay effective (GF-780: epoch_drain_timeout_ms 100ms >
+# batch_timeout; equality/inversion yields a chain_broken race). runtime.exs runs AFTER
+# the compile-time config, so an unguarded set would overwrite the 50ms seam.
 if config_env() != :test do
   config :span_chain,
     broadway_batch_timeout_ms:
@@ -29,14 +29,14 @@ if config_env() != :test do
 end
 
 if config_env() == :prod do
-  # GF-771: produkční secrets jdou výhradně přes env vars (fail-fast při startu
-  # pokud chybí). Žádný hardcoded prod secret v kódu ani gitu.
+  # GF-771: production secrets come exclusively from env vars (fail-fast at startup
+  # if missing). No hardcoded prod secret in the code or in git.
   config :span_chain, :api_key, System.fetch_env!("GF_API_KEY")
 
-  # GF-783: Phoenix Endpoint (port 4001) musí servírovat z OTP release. `mix
-  # phx.server` v releasu neexistuje → `server: true` explicitně. Bind 0.0.0.0 aby
-  # byl port dosažitelný z Docker sítě; `check_origin: false` pro self-hosting za
-  # reverse proxy / localhost.
+  # GF-783: the Phoenix Endpoint (port 4001) must serve from the OTP release. `mix
+  # phx.server` does not exist in a release → set `server: true` explicitly. Bind 0.0.0.0 so
+  # the port is reachable from the Docker network; `check_origin: false` for self-hosting behind
+  # a reverse proxy / localhost.
   config :span_chain, SpanChain.Web.Endpoint,
     server: true,
     http: [ip: {0, 0, 0, 0}, port: Application.get_env(:span_chain, :trail_port, 4001)],
@@ -44,9 +44,9 @@ if config_env() == :prod do
     secret_key_base: System.fetch_env!("SECRET_KEY_BASE"),
     check_origin: false
 
-  # GF-704: Postgres prod connection přes DATABASE_URL (fail-fast pokud chybí).
-  # GF-783: SSL je opt-in přes DATABASE_SSL (default off) — Docker-interní Postgres
-  # nemá TLS; nastav DATABASE_SSL=true pro managed/remote Postgres který ho vyžaduje.
+  # GF-704: Postgres prod connection via DATABASE_URL (fail-fast if missing).
+  # GF-783: SSL is opt-in via DATABASE_SSL (default off) — the Docker-internal Postgres
+  # has no TLS; set DATABASE_SSL=true for a managed/remote Postgres that requires it.
   config :span_chain, SpanChain.Repo,
     url: System.fetch_env!("DATABASE_URL"),
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
