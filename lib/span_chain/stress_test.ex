@@ -1,12 +1,12 @@
 defmodule SpanChain.StressTest do
   @moduledoc """
-  Load generator pro GhostFactory ingestion pipeline.
+  Load generator for the GhostFactory ingestion pipeline.
 
-  Spustí `agents` paralelních agentů (každý jako vlastní `Task` + `Harness`),
-  každý agent vytvoří jeden vnější `agent_run` span obalující `spans_per_agent`
-  vnitřních `llm_call` spanů. Každý 10. llm_call simuluje chybu (`raise`) —
-  Harness ji uloží jako error span a smyčka pokračuje, abychom garantovali
-  `agents * (spans_per_agent + 1)` celkových řádků v Ledgeru.
+  Starts `agents` parallel agents (each as its own `Task` + `Harness`),
+  each agent creates one outer `agent_run` span wrapping `spans_per_agent`
+  inner `llm_call` spans. Every 10th llm_call simulates an error (`raise`) —
+  the Harness stores it as an error span and the loop continues, so we guarantee
+  `agents * (spans_per_agent + 1)` total rows in the Ledger.
 
   ## Example
 
@@ -21,7 +21,7 @@ defmodule SpanChain.StressTest do
         abandoned_spans: 0
       }
 
-  Pro stress run cca 5000 spanů:
+  For a stress run of roughly 5000 spans:
 
       mix run -e "SpanChain.StressTest.run(agents: 100, spans_per_agent: 50)"
   """
@@ -120,9 +120,9 @@ defmodule SpanChain.StressTest do
   # Post-run flush + metrics
   # --------------------------------------------------------------------------
 
-  # GF-667: SGS.flush_now neexistuje (slim refactor). Broadway flush je async
-  # s batch_timeout 1s. Místo synchronního flush polluje Repo aggregate count
-  # pro tento `prefix` until reaches `expected_total` (nebo 30s timeout).
+  # GF-667: SGS.flush_now does not exist (slim refactor). The Broadway flush is async
+  # with batch_timeout 1s. Instead of a synchronous flush, poll the Repo aggregate count
+  # for this `prefix` until it reaches `expected_total` (or a 30s timeout).
   defp flush_all(prefix, expected_total) do
     pattern = prefix <> "%"
     deadline = System.monotonic_time(:millisecond) + 30_000
@@ -189,21 +189,21 @@ defmodule SpanChain.StressTest do
   end
 
   # ==========================================================================
-  # GF-773 / GF-772 — benchmark sada pro reálná LP čísla.
+  # GF-773 / GF-772 — benchmark suite for real LP numbers.
   #
-  # Měří se v DEV env (reálná SQLite WAL DB, reálné per-batch commity,
-  # batch_timeout 1000ms) — NE v test env sandboxu (savepoint "commity" bez
-  # fsync = nadhodnocený throughput). Drží se původní baseline metodika
-  # (elapsed = od startu ingestu po commit všech řádků). Pohání SGS přímo —
-  # žádný Harness `Process.sleep` mezi spany (GF-773 §1).
+  # Measured in the DEV env (real SQLite WAL DB, real per-batch commits,
+  # batch_timeout 1000ms) — NOT in the test env sandbox (savepoint "commits" without
+  # fsync = overstated throughput). Keeps the original baseline methodology
+  # (elapsed = from ingest start to the commit of all rows). Drives the SGS directly —
+  # no Harness `Process.sleep` between spans (GF-773 §1).
   #
-  # Spuštění (reálná čísla pro landing page):
+  # Run (real numbers for the landing page):
   #     mix run -e "SpanChain.StressTest.bench_report()"
   # ==========================================================================
 
   @buffer_registry SpanChain.Ingestion.BufferRegistry
 
-  @doc "Celá benchmark sada (GF-773 §1–4 + GF-772 §5) + §6 summary blok."
+  @doc "The whole benchmark suite (GF-773 §1–4 + GF-772 §5) + the §6 summary block."
   def bench_report do
     date = Date.utc_today() |> Date.to_iso8601()
 
@@ -219,7 +219,7 @@ defmodule SpanChain.StressTest do
     %{throughput: a, scalability: [a, b, c], memory_kb: mem_kb, latency: lat, flood: flood}
   end
 
-  @doc "Sleep-free throughput: `agents` paralelních runů × `spans_per_agent` spanů."
+  @doc "Sleep-free throughput: `agents` parallel runs × `spans_per_agent` spans."
   def bench_throughput(agents, spans_per_agent) do
     prefix = unique_prefix("bench")
     expected = agents * spans_per_agent
@@ -243,7 +243,7 @@ defmodule SpanChain.StressTest do
     }
   end
 
-  @doc "SGS memory footprint jedné session přes `process_info(:memory)` (GF-773 §3)."
+  @doc "SGS memory footprint of a single session via `process_info(:memory)` (GF-773 §3)."
   def bench_memory do
     run_id = unique_prefix("mem") <> "1"
     {:ok, pid} = SessionSupervisor.ensure_session(run_id)
@@ -252,7 +252,7 @@ defmodule SpanChain.StressTest do
     div(bytes, 1024)
   end
 
-  @doc "End-to-end latence ingest → `{:spans_flushed}` pro `samples` souběžných 1-span runů (GF-773 §4)."
+  @doc "End-to-end latency ingest → `{:spans_flushed}` for `samples` concurrent 1-span runs (GF-773 §4)."
   def bench_latency(samples) do
     prefix = unique_prefix("lat")
 
@@ -287,7 +287,7 @@ defmodule SpanChain.StressTest do
     percentiles_ms(micros)
   end
 
-  @doc "GF-772 flood: 50 × 200 spanů (10k) bez sleep; peak buffer fill + data loss + recovery."
+  @doc "GF-772 flood: 50 × 200 spans (10k) without sleep; peak buffer fill + data loss + recovery."
   def bench_flood do
     prefix = unique_prefix("flood")
     agents = 50
@@ -302,7 +302,7 @@ defmodule SpanChain.StressTest do
 
     db_count = count_rows(prefix <> "%")
 
-    # Recovery: po 5s zkus malý ingest — projde celou pipeline bez degradace?
+    # Recovery: after 5s try a small ingest — does it pass the whole pipeline without degradation?
     Process.sleep(5_000)
 
     %{
@@ -316,11 +316,11 @@ defmodule SpanChain.StressTest do
   end
 
   # --------------------------------------------------------------------------
-  # Bench interní helpery
+  # Bench internal helpers
   # --------------------------------------------------------------------------
 
-  # Paralelní ingest přímo přes SGS (bez Harness/sleep). Drainuje stream pro
-  # side-effekt; async_stream yielduje {:exit, _} pro spadlé tasky (neraisne).
+  # Parallel ingest directly via the SGS (no Harness/sleep). Drains the stream for the
+  # side effect; async_stream yields {:exit, _} for crashed tasks (does not raise).
   defp ingest_load(agents, spans, prefix) do
     1..agents
     |> Task.async_stream(
@@ -368,9 +368,9 @@ defmodule SpanChain.StressTest do
 
   defp pct(sorted, q), do: Enum.at(sorted, max(round(q * length(sorted)) - 1, 0))
 
-  # Background sampler — periodicky čte hloubku in-memory :queue v BufferProducer
-  # (přes BufferRegistry singleton, NE Process.whereis — producer běží pod
-  # interním Broadway name) a drží pozorované maximum.
+  # Background sampler — periodically reads the depth of the in-memory :queue in BufferProducer
+  # (via the BufferRegistry singleton, NOT Process.whereis — the producer runs under an
+  # internal Broadway name) and keeps the observed maximum.
   defp start_queue_sampler do
     ref = make_ref()
     parent = self()

@@ -1,7 +1,7 @@
 defmodule SpanChain.Ingestion.OtlpTranslatorTest do
   @moduledoc """
-  Unit testy pro OTLP/HTTP JSON translator (GF-649). Pure funkce, žádný DB,
-  žádný GenServer — translator je adaptér na HTTP hranici.
+  Unit tests for the OTLP/HTTP JSON translator (GF-649). Pure functions, no DB,
+  no GenServer — the translator is an adapter at the HTTP boundary.
   """
 
   use ExUnit.Case, async: true
@@ -87,9 +87,9 @@ defmodule SpanChain.Ingestion.OtlpTranslatorTest do
 
     test "nano timestamp parsing uses :nanosecond unit (microsecond precision in output)" do
       # 1716000000000123456 ns = 2024-05-18T02:40:00.000123 UTC (456 ns truncated).
-      # Kdyby parser bral :millisecond, číslo by bylo mimo DateTime range → raise →
-      # rescue → nil. `.000123` microsecond část v ISO8601 výstupu DOKAZUJE správnou
-      # :nanosecond unit (nanosekundy '456' truncated jsou L2 acceptable).
+      # If the parser used :millisecond, the number would be out of DateTime range → raise →
+      # rescue → nil. The `.000123` microsecond part in the ISO8601 output PROVES the correct
+      # :nanosecond unit (the truncated '456' nanoseconds are L2 acceptable).
       body = valid_otlp_request("ns-test", %{"startTimeUnixNano" => "1716000000000123456"})
 
       assert {:ok, [{"ns-test", nil, [span]}]} = OtlpTranslator.translate(body)
@@ -155,7 +155,7 @@ defmodule SpanChain.Ingestion.OtlpTranslatorTest do
     end
 
     test "GF-747: doubleValue with integer JSON value (0.0 decoded as integer) still maps" do
-      # JSON decoder může vrátit integer pro 0.0 → is_number guard chrání
+      # The JSON decoder may return an integer for 0.0 → the is_number guard protects against this
       body =
         valid_otlp_request("double-int", %{
           "attributes" => [

@@ -1,8 +1,8 @@
 defmodule SpanChain.Cassettes.ReplayerTest do
   @moduledoc """
-  Replayer unit tests (GF-712). Pokrývá: payload-first precision round-trip,
-  multi-batch wait synchronizaci (cassette > batch_size 50), hash chain
-  validity po replay, a `{:error, :timeout}` cestu.
+  Replayer unit tests (GF-712). Covers: payload-first precision round-trip,
+  multi-batch wait synchronization (cassette > batch_size 50), hash chain
+  validity after replay, and the `{:error, :timeout}` path.
   """
 
   use SpanChain.DataCase, async: false
@@ -33,11 +33,11 @@ defmodule SpanChain.Cassettes.ReplayerTest do
     }
   end
 
-  # GF-781/GF-782: čekáme na committed COUNT, ne na odhadnutý počet batchů. Broadway
-  # je demand-driven — pod zátěží může 120 spanů rozdělit na > ceil(N/50) batchů, takže
-  # počítání batchů přes in-transaction telemetry vracelo brzo a `Cassettes.record`
-  # snapshotnul < N řádků → flaky `length(snapshot) == N`. Subscribe PŘED ingest +
-  # symetrický unsubscribe; topic je distinktní od replay/2 `run:#{new_run_id}`.
+  # GF-781/GF-782: we wait for the committed COUNT, not for an estimated number of batches. Broadway
+  # is demand-driven — under load 120 spans may split into > ceil(N/50) batches, so
+  # counting batches via in-transaction telemetry returned early and `Cassettes.record`
+  # snapshotted < N rows → flaky `length(snapshot) == N`. Subscribe BEFORE ingest +
+  # symmetric unsubscribe; the topic is distinct from replay/2's `run:#{new_run_id}`.
   defp record_cassette(run_id, spans, cassette_id) do
     Phoenix.PubSub.subscribe(SpanChain.PubSub, "run:#{run_id}")
     {:ok, _pid} = SessionSupervisor.ensure_session(run_id)
@@ -49,8 +49,8 @@ defmodule SpanChain.Cassettes.ReplayerTest do
     cassette
   end
 
-  # Loop na post-commit `{:spans_flushed}` (GF-703) dokud count >= expected. Stejný
-  # vzor jako Replayer.wait_for_all_spans/3 a session_gen_server_test.wait_for_all_committed.
+  # Loop on the post-commit `{:spans_flushed}` (GF-703) until count >= expected. Same
+  # pattern as Replayer.wait_for_all_spans/3 and session_gen_server_test.wait_for_all_committed.
   defp wait_for_committed(run_id, expected, timeout_ms \\ 10_000) do
     if count_committed(run_id) >= expected do
       :ok
@@ -151,19 +151,19 @@ defmodule SpanChain.Cassettes.ReplayerTest do
   end
 
   describe "wait_for_all_spans/3 — GF-725 absolute deadline" do
-    # Pre-fix: 3rd argument byl relativní timeout, který se předával beze změny
-    # do rekurzivního volání → každý {:spans_flushed} broadcast resetoval timer
-    # → cassette s 10 batchy mohla čekat 10× timeout. Test ověří že total elapsed
-    # NEPŘEKROČÍ původní deadline ani když dorazí několik broadcastů.
-    test "celkový elapsed je bounded by initial deadline napříč recursi" do
-      # Synthetic run_id — žádné rows v DB, count_rows vždy vrátí 0.
+    # Pre-fix: the 3rd argument was a relative timeout passed unchanged
+    # into the recursive call → every {:spans_flushed} broadcast reset the timer
+    # → a cassette with 10 batches could wait 10× the timeout. The test verifies that total elapsed
+    # does NOT exceed the original deadline even when several broadcasts arrive.
+    test "total elapsed is bounded by the initial deadline across recursion" do
+      # Synthetic run_id — no rows in the DB, count_rows always returns 0.
       orphan = "orphan-" <> fresh_run_id("dl")
       deadline_ms = 150
 
-      # Pošli si pre-emptivně 5 broadcastů. Každý projde matchem
+      # Pre-emptively send 5 broadcasts to self. Each passes the match
       # `{:spans_flushed, ^run_id}`, count_rows=0 < expected=10 → recurse.
-      # Po vyčerpání mailboxu funkce blokuje na `after timeout` — total elapsed
-      # MUSÍ zůstat v rámci deadline_ms (s tolerancí na overhead).
+      # After the mailbox is drained the function blocks on `after timeout` — total elapsed
+      # MUST stay within deadline_ms (with tolerance for overhead).
       Enum.each(1..5, fn _ -> send(self(), {:spans_flushed, orphan}) end)
 
       deadline = System.monotonic_time(:millisecond) + deadline_ms
@@ -173,16 +173,16 @@ defmodule SpanChain.Cassettes.ReplayerTest do
 
       elapsed = System.monotonic_time(:millisecond) - t0
 
-      # Pre-fix by elapsed bylo ~5 × deadline_ms (~750ms) — každý broadcast
-      # resetoval timer. Post-fix musí být < ~1.5× deadline (overhead na 5
-      # rekurzi + final receive blok). 250ms ceiling drží daleko od pre-fix worst case.
+      # Pre-fix, elapsed would be ~5 × deadline_ms (~750ms) — every broadcast
+      # reset the timer. Post-fix it must be < ~1.5× deadline (overhead for 5
+      # recursions + the final receive block). The 250ms ceiling stays well clear of the pre-fix worst case.
       assert elapsed < 250,
-             "elapsed=#{elapsed}ms překročilo deadline=#{deadline_ms}ms (pre-fix would be ~750ms)"
+             "elapsed=#{elapsed}ms exceeded deadline=#{deadline_ms}ms (pre-fix would be ~750ms)"
     end
   end
 
   describe "replay/2 — GF-726 UUID-based replay_id" do
-    test "replay generuje UUID-based run_id (žádný System.unique_integer)" do
+    test "replay generates a UUID-based run_id (no System.unique_integer)" do
       run_id = fresh_run_id("uuid-src")
       spans = [span_map(0)]
       cassette = record_cassette(run_id, spans, fresh_cassette_id())
@@ -195,13 +195,13 @@ defmodule SpanChain.Cassettes.ReplayerTest do
       assert String.starts_with?(replayed_1, prefix)
       assert String.starts_with?(replayed_2, prefix)
 
-      # UUID část za prefixem musí být validní UUID (36 chars s pomlčkami).
+      # The UUID part after the prefix must be a valid UUID (36 chars with dashes).
       uuid_1 = String.replace_prefix(replayed_1, prefix, "")
       uuid_2 = String.replace_prefix(replayed_2, prefix, "")
       assert {:ok, ^uuid_1} = Ecto.UUID.cast(uuid_1)
       assert {:ok, ^uuid_2} = Ecto.UUID.cast(uuid_2)
 
-      # Dva po sobě jdoucí replaye musí mít RŮZNÉ run_id (kolize check).
+      # Two consecutive replays must have DIFFERENT run_ids (collision check).
       refute replayed_1 == replayed_2
     end
   end

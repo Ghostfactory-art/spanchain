@@ -1,12 +1,12 @@
 defmodule SpanChain.Ingestion.PipelineNegativeTest do
   @moduledoc """
-  Negativní cesty Pipeline (GF-648) — testuje retry vyčerpání, dead-letter
-  fallback, a defenzivní vrstvu když dead-letter sám selže.
+  Negative paths of the Pipeline (GF-648) — tests retry exhaustion, the dead-letter
+  fallback, and the defensive layer when the dead-letter itself fails.
 
-  Stubs swap přes `Application.put_env(:span_chain, :ledger_module, ...)`
-  a `:dead_letter_module` v setup; `on_exit` restoruje prior hodnoty.
-  `async: false` zaručí, že žádný paralelní test soubor nemůže číst stub
-  místo reálného Ledgeru.
+  Stubs are swapped via `Application.put_env(:span_chain, :ledger_module, ...)`
+  and `:dead_letter_module` in setup; `on_exit` restores the prior values.
+  `async: false` guarantees that no parallel test file can read the stub
+  instead of the real Ledger.
   """
 
   use SpanChain.DataCase, async: false
@@ -15,11 +15,11 @@ defmodule SpanChain.Ingestion.PipelineNegativeTest do
   alias SpanChain.Ingestion.{Pipeline, SessionGenServer, SessionSupervisor}
 
   # ---------------------------------------------------------------------------
-  # Inline stubs (CLAUDE.md: žádný Mox — hand-rolled DI seams)
+  # Inline stubs (CLAUDE.md: no Mox — hand-rolled DI seams)
   # ---------------------------------------------------------------------------
 
   defmodule LedgerRaisingStub do
-    @moduledoc "Vždy raise — simuluje trvalý DB výpadek (Scenarios A, C)."
+    @moduledoc "Always raises — simulates a permanent DB outage (Scenarios A, C)."
     @behaviour SpanChain.Ledger.Behaviour
 
     def insert_batch(_entries), do: raise("stub_db_down")
@@ -27,12 +27,12 @@ defmodule SpanChain.Ingestion.PipelineNegativeTest do
 
   defmodule LedgerEventuallyOkStub do
     @moduledoc """
-    První 2 pokusy raise, 3. delegate na reálný Ledger.insert_batch
-    (Scenario B). Counter v dedikovaném `Agent` procesu (PID v Application
-    env), survives `Process.sleep` v Pipeline.with_retry.
+    The first 2 attempts raise, the 3rd delegates to the real Ledger.insert_batch
+    (Scenario B). The counter lives in a dedicated `Agent` process (PID in Application
+    env), surviving the `Process.sleep` in Pipeline.with_retry.
 
-    GF-702: dřív globální VM-state mechanismus s GC overhead — nyní Agent
-    process per-test, čistá cleanup sémantika přes `Agent.stop`.
+    GF-702: previously a global VM-state mechanism with GC overhead — now an Agent
+    process per-test, with clean cleanup semantics via `Agent.stop`.
     """
     @behaviour SpanChain.Ledger.Behaviour
 
@@ -69,13 +69,13 @@ defmodule SpanChain.Ingestion.PipelineNegativeTest do
   end
 
   defmodule DeadLetterRaisingStub do
-    @moduledoc "DeadLetter.store raise — Scenario C defenzivní vrstva."
+    @moduledoc "DeadLetter.store raises — Scenario C defensive layer."
     def store(_run_id, _batch, _reason), do: raise("stub_dead_letter_down")
   end
 
   # ---------------------------------------------------------------------------
-  # Telemetry helpers — filtrace na vlastní run_id (paralelní happy-path testy
-  # v `pipeline_test.exs` sdílí stejnou Pipeline a fire-uj události napříč).
+  # Telemetry helpers — filter on our own run_id (the parallel happy-path tests
+  # in `pipeline_test.exs` share the same Pipeline and fire events across it).
   # ---------------------------------------------------------------------------
 
   defp attach_event(event, run_id) do
@@ -124,7 +124,7 @@ defmodule SpanChain.Ingestion.PipelineNegativeTest do
 
     # -------------------------------------------------------------------------
     # Scenario B (test order: first — proves harness + verify_ledger work)
-    # 2× failure, 3. attempt success → žádný DeadLetter, valid hash chain.
+    # 2× failure, 3rd attempt success → no DeadLetter, valid hash chain.
     # -------------------------------------------------------------------------
 
     test "scenario B — 2 failures + 1 success persists entry, no dead letter" do
@@ -163,8 +163,8 @@ defmodule SpanChain.Ingestion.PipelineNegativeTest do
       assert count >= 1
       assert run_id in meta.run_ids
 
-      # Filtrujeme dead-letter entries na náš run_id — paralelní tests mohou
-      # přidat své vlastní záznamy do shared DB.
+      # We filter dead-letter entries to our run_id — parallel tests may
+      # add their own records to the shared DB.
       dead_letters =
         from(d in DeadLetter, where: d.run_id == ^run_id and d.resolved == false)
         |> Repo.all()
@@ -176,8 +176,8 @@ defmodule SpanChain.Ingestion.PipelineNegativeTest do
     end
 
     # -------------------------------------------------------------------------
-    # Scenario C — DeadLetter.store sám raise → Pipeline + SGS přežijí,
-    # telemetry event [:gf, :flush, :dead_letter] stále fire.
+    # Scenario C — DeadLetter.store itself raises → Pipeline + SGS survive,
+    # the telemetry event [:gf, :flush, :dead_letter] still fires.
     # -------------------------------------------------------------------------
 
     test "scenario C — dead_letter raise does not crash Pipeline or SGS, telemetry still emits" do
@@ -194,18 +194,18 @@ defmodule SpanChain.Ingestion.PipelineNegativeTest do
       assert_receive {[:gf, :flush, :dead_letter], ^dl_ref, _m, meta}, 2_000
       assert run_id in meta.run_ids
 
-      # Defenzivní vrstva: ani Pipeline (Broadway top supervisor) ani SGS nesmí
-      # crashnout když dead-letter store raise.
+      # Defensive layer: neither the Pipeline (Broadway top supervisor) nor the SGS may
+      # crash when the dead-letter store raises.
       assert Process.alive?(sgs_pid)
       assert Process.alive?(pipeline_pid)
       assert Process.whereis(Pipeline) == pipeline_pid
 
-      # Stub jen raise → žádný řádek v dead_letter_entries pro tento run.
+      # The stub only raises → no row in dead_letter_entries for this run.
       assert Repo.aggregate(from(d in DeadLetter, where: d.run_id == ^run_id), :count, :id) == 0
     end
 
     # -------------------------------------------------------------------------
-    # Coverage extras (Done When: ≥5 nových testů)
+    # Coverage extras (Done When: ≥5 new tests)
     # -------------------------------------------------------------------------
 
     test "scenario A — error_reason in DeadLetter includes stub failure message" do
@@ -239,8 +239,8 @@ defmodule SpanChain.Ingestion.PipelineNegativeTest do
       {:ok, 1} = SessionGenServer.ingest_spans(run_id, [%{"name" => "scenario_c_1"}])
       assert_receive {[:gf, :flush, :dead_letter], ^dl_ref, _m, _meta}, 2_000
 
-      # Druhý batch po store failure musí projít stejnou cestou — Pipeline nesmí
-      # být ve vadném stavu.
+      # The second batch after a store failure must go through the same path — the Pipeline must
+      # not be in a broken state.
       {:ok, 1} = SessionGenServer.ingest_spans(run_id, [%{"name" => "scenario_c_2"}])
       assert_receive {[:gf, :flush, :dead_letter], ^dl_ref, _m, _meta}, 2_000
     end

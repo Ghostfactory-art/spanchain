@@ -35,10 +35,10 @@ defmodule SpanChain.Cassettes.Replayer do
     spans = cassette.snapshot
     expected = length(spans)
     timeout = opts[:timeout] || @default_timeout_ms
-    # GF-725: absolute monotonic deadline místo relativního timeout — rekurzivní
-    # `wait_for_all_spans` jinak resetoval timer při každém broadcastu, takže
-    # cassette s N batchy mohla blokovat HTTP request až N × timeout místo
-    # garantovaného `timeout` celkem.
+    # GF-725: an absolute monotonic deadline instead of a relative timeout — the recursive
+    # `wait_for_all_spans` otherwise reset the timer on every broadcast, so a
+    # cassette with N batches could block the HTTP request up to N × timeout instead of
+    # the guaranteed `timeout` total.
     deadline = System.monotonic_time(:millisecond) + timeout
     topic = "run:#{new_run_id}"
 
@@ -64,9 +64,9 @@ defmodule SpanChain.Cassettes.Replayer do
   end
 
   @doc false
-  # Test seam (GF-725): viditelnost zvýšena z `defp` na `def` aby unit test mohl
-  # přímo ověřit deadline pattern bez konstrukce 3+ batch cassety s mockovaným
-  # DB timingem. NEpoužívat z produkčního kódu — caller je výhradně `replay/2`.
+  # Test seam (GF-725): visibility raised from `defp` to `def` so a unit test can
+  # directly verify the deadline pattern without constructing a 3+ batch cassette with mocked
+  # DB timing. Do NOT use from production code — the only caller is `replay/2`.
   #
   # Empty cassette short-circuit: 0 spans → 0 broadcasts.
   def wait_for_all_spans(_run_id, 0, _deadline), do: {:ok, 0}
@@ -92,11 +92,11 @@ defmodule SpanChain.Cassettes.Replayer do
     Repo.aggregate(from(l in Ledger, where: l.run_id == ^run_id), :count, :run_id)
   end
 
-  # GF-726: Pre-fix používal VM-local positive integer counter, který se po
-  # BEAM restartu resetuje od malého čísla → kolize s historickými replay
-  # `run_id` v DB přes `(run_id, epoch_id, seq)` unique index.
-  # `Ecto.UUID.generate/0` (UUID v4) je globally unique nezávisle na VM
-  # lifecycle; Ecto je už v deps, takže žádná nová závislost.
+  # GF-726: The pre-fix used a VM-local positive integer counter, which after a
+  # BEAM restart resets from a small number → collisions with historical replay
+  # `run_id`s in the DB via the `(run_id, epoch_id, seq)` unique index.
+  # `Ecto.UUID.generate/0` (UUID v4) is globally unique regardless of VM
+  # lifecycle; Ecto is already in deps, so no new dependency.
   defp generate_run_id(cassette_id) do
     "replay-#{cassette_id}-#{Ecto.UUID.generate()}"
   end

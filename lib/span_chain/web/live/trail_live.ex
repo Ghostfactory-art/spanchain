@@ -1,15 +1,15 @@
 defmodule SpanChain.Web.TrailLive do
   @moduledoc """
-  LiveView pro inspekci hash-chain Ledgeru.
+  LiveView for inspecting the hash-chain Ledger.
 
-  - `/trail` (action `:index`) — seznam runů (run_id, span count, časy)
-  - `/trail/:run_id` (action `:detail`) — stromová vizualizace spanů,
-    hierarchie z `parent_span_id`.
+  - `/trail` (action `:index`) — list of runs (run_id, span count, times)
+  - `/trail/:run_id` (action `:detail`) — tree visualization of spans,
+    hierarchy from `parent_span_id`.
 
-  Real-time auto-refresh přes `Phoenix.PubSub`: Pipeline broadcastuje
-  `{:run_updated, run_id}` na topic `"runs"` a `{:spans_flushed, run_id}`
-  na topic `"run:RUN_ID"` po každém úspěšném batch insertu.
-  `handle_info/2` re-fetchuje data identickým dotazem jako `handle_params/3`.
+  Real-time auto-refresh via `Phoenix.PubSub`: the Pipeline broadcasts
+  `{:run_updated, run_id}` on the topic `"runs"` and `{:spans_flushed, run_id}`
+  on the topic `"run:RUN_ID"` after every successful batch insert.
+  `handle_info/2` re-fetches the data with the same query as `handle_params/3`.
   """
 
   use Phoenix.LiveView
@@ -58,8 +58,8 @@ defmodule SpanChain.Web.TrailLive do
      |> assign(:page_title, "GhostFactory Trail")}
   end
 
-  # PubSub messages — re-fetch identickým dotazem jako handle_params; fallback
-  # clause kryje cizí run_id v detail view + neznámé zprávy.
+  # PubSub messages — re-fetch with the same query as handle_params; the fallback
+  # clause covers a foreign run_id in the detail view + unknown messages.
   @impl true
   def handle_info({:run_updated, _run_id}, %{assigns: %{view: :index}} = socket) do
     {:noreply, assign(socket, :runs, list_runs())}
@@ -279,8 +279,8 @@ defmodule SpanChain.Web.TrailLive do
 
     error_counts =
       from(l in Ledger,
-        # GF-704: Postgres jsonb extrakce (`->`/`->>`) místo SQLite `json_extract`.
-        # payload je :map → jsonb; `->'attributes'->>'status'` vrátí text nebo NULL.
+        # GF-704: Postgres jsonb extraction (`->`/`->>`) instead of SQLite `json_extract`.
+        # payload is :map → jsonb; `->'attributes'->>'status'` returns text or NULL.
         where: fragment("?->'attributes'->>'status' = 'error'", l.payload),
         group_by: l.run_id,
         select: {l.run_id, count(l.id)}

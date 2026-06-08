@@ -1,5 +1,5 @@
 defmodule SpanChain.Run do
-  @moduledoc "Run-level metadata agregátor. Jeden řádek per run_id."
+  @moduledoc "Run-level metadata aggregator. One row per run_id."
 
   use Ecto.Schema
 
@@ -24,8 +24,9 @@ defmodule SpanChain.Run do
     field(:agent_name, :string)
     field(:model, :string)
     field(:env, :string)
-    # GF-706: eval_id field MUSÍ být explicitně před belongs_to s define_field: false,
-    # jinak by Ecto nevytvořil sloupec ve schemata projection.
+
+    # GF-706: the eval_id field MUST be declared explicitly before belongs_to with define_field: false,
+    # otherwise Ecto would not create the column in the schema projection.
     field(:eval_id, :string)
     # GF-748: gf.agent.* projection — first-wins via Pipeline upsert (COALESCE)
     field(:system_prompt_hash, :string)

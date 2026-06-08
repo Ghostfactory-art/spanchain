@@ -1,5 +1,5 @@
 defmodule SpanChain.Web.Layouts do
-  @moduledoc "Root layout pro Phoenix Trail UI. Inline CSS, žádný Tailwind."
+  @moduledoc "Root layout for the Phoenix Trail UI. Inline CSS, no Tailwind."
 
   use Phoenix.Component
 

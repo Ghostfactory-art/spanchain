@@ -1,11 +1,11 @@
 defmodule SpanChain.Eval do
   @moduledoc """
-  Eval-level metadata agregátor (GF-706). Zastřešující doména pro porovnávání
-  více `runs` se stejným záměrem (např. "stejná otázka, 3 různé modely").
+  Eval-level metadata aggregator (GF-706). An umbrella domain for comparing
+  multiple `runs` with the same intent (e.g. "same question, 3 different models").
 
-  Klient generuje `eval_id` a posílá ho jako OTLP
-  `resource.attributes["gf.eval_id"]`. Backend pasivně upsertuje associaci
-  v `SessionGenServer.init/1` (best-effort, nesmí crashnout SGS).
+  The client generates the `eval_id` and sends it as the OTLP
+  `resource.attributes["gf.eval_id"]`. The backend passively upserts the association
+  in `SessionGenServer.init/1` (best-effort, must not crash the SGS).
   """
 
   use Ecto.Schema
@@ -36,7 +36,7 @@ defmodule SpanChain.Eval do
     timestamps()
   end
 
-  @doc "Changeset pro create/update — `eval_id` je required."
+  @doc "Changeset for create/update — `eval_id` is required."
   @spec changeset(t() | %__MODULE__{}, map()) :: Ecto.Changeset.t()
   def changeset(eval, attrs) do
     eval

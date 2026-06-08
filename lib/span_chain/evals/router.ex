@@ -1,13 +1,13 @@
 defmodule SpanChain.Evals.Router do
   @moduledoc """
-  HTTP API pro Evals doménu (GF-706). Sub-router forwardovaný z hlavního
-  `Ingestion.Router` na `/evals/*`. AuthPlug už proběhl v hlavním routeru,
-  takže všechny zde definované routes jsou autentizované.
+  HTTP API for the Evals domain (GF-706). A sub-router forwarded from the main
+  `Ingestion.Router` to `/evals/*`. AuthPlug has already run in the main router,
+  so all routes defined here are authenticated.
 
   Routes:
-    * `POST /` — vytvoří nový Eval (201 / 400)
-    * `GET /:eval_id` — detail Evalu s run_count / run_ids (200 / 404)
-    * `GET /:eval_id/compare?run_a=X&run_b=Y` — strukturální diff dvou runů
+    * `POST /` — creates a new Eval (201 / 400)
+    * `GET /:eval_id` — Eval detail with run_count / run_ids (200 / 404)
+    * `GET /:eval_id/compare?run_a=X&run_b=Y` — structural diff of two runs
   """
 
   use Plug.Router

@@ -1,23 +1,23 @@
 defmodule SpanChain.Agent do
   @moduledoc """
-  Agent jako GenServer s hash-chain Ledgerem.
+  An agent as a GenServer with a hash-chain Ledger.
 
-  Každý agent:
-  - běží jako izolovaný OTP process
-  - drží vlastní stav (idle → running → done/failed)
-  - zapisuje každou akci do append-only Ledgeru
-  - každý záznam v Ledgeru je hash předchozího záznamu → chain integrity
-  - generuje Spany (started_at, ended_at, attributes)
+  Each agent:
+  - runs as an isolated OTP process
+  - holds its own state (idle → running → done/failed)
+  - writes every action to an append-only Ledger
+  - each Ledger record is a hash of the previous record → chain integrity
+  - generates Spans (started_at, ended_at, attributes)
 
-  Tohle je základ pro GF replay: Ledger je source of truth,
-  ne "re-run se stejnými inputy".
+  This is the basis for GF replay: the Ledger is the source of truth,
+  not a "re-run with the same inputs".
   """
 
   use GenServer
   require Logger
 
   # ---------------------------------------------------------------------------
-  # Typy
+  # Types
   # ---------------------------------------------------------------------------
 
   @type agent_id :: String.t()
@@ -61,27 +61,27 @@ defmodule SpanChain.Agent do
     GenServer.start_link(__MODULE__, %{id: id, name: name}, name: via(id))
   end
 
-  @doc "Spustí task na agentovi. Synchronní — blokuje do dokončení."
+  @doc "Runs a task on the agent. Synchronous — blocks until completion."
   def run(agent_id, task, timeout \\ 30_000) do
     GenServer.call(via(agent_id), {:run, task}, timeout)
   end
 
-  @doc "Vrátí aktuální stav agenta."
+  @doc "Returns the agent's current state."
   def get_state(agent_id) do
     GenServer.call(via(agent_id), :get_state)
   end
 
-  @doc "Vrátí celý Ledger (chronologicky). Základ pro replay."
+  @doc "Returns the whole Ledger (chronologically). The basis for replay."
   def get_ledger(agent_id) do
     GenServer.call(via(agent_id), :get_ledger)
   end
 
-  @doc "Vrátí všechny Spany."
+  @doc "Returns all Spans."
   def get_spans(agent_id) do
     GenServer.call(via(agent_id), :get_spans)
   end
 
-  @doc "Ověří integritu hash-chainu v Ledgeru."
+  @doc "Verifies the integrity of the hash chain in the Ledger."
   def verify_ledger(agent_id) do
     GenServer.call(via(agent_id), :verify_ledger)
   end
@@ -118,7 +118,7 @@ defmodule SpanChain.Agent do
   def handle_call({:run, task}, _from, state) do
     Logger.info("[Agent #{state.id}] Starting task: #{inspect(task)}")
 
-    # Otevři span
+    # Open a span
     span = open_span("agent.run", %{task: task, agent_id: state.id})
 
     state =
@@ -127,7 +127,7 @@ defmodule SpanChain.Agent do
       |> Map.put(:current_span, span)
       |> ledger_append({:task_started, %{task: task, span_id: span.id}})
 
-    # Vykonej task
+    # Execute the task
     {result, status, error} =
       try do
         r = execute_task(task, state)
@@ -138,7 +138,7 @@ defmodule SpanChain.Agent do
           {nil, :failed, e}
       end
 
-    # Zavři span
+    # Close the span
     span = close_span(span, result, status)
 
     state =
@@ -212,7 +212,7 @@ defmodule SpanChain.Agent do
   defp verify_chain([]), do: {:ok, :empty}
 
   defp verify_chain(entries) do
-    # Projdi chain od nejstaršího a ověř každý hash
+    # Walk the chain from the oldest and verify each hash
     result =
       entries
       |> Enum.chunk_every(2, 1, :discard)
@@ -222,7 +222,7 @@ defmodule SpanChain.Agent do
           {_seq_b, _hash_b, prev_hash_b, _event_b, _ts_b}
         ] ->
           recomputed = compute_hash(prev_hash_b |> (fn _ -> nil end).(), seq_a, event_a)
-          # Zjednodušená verifikace - v produkci by byla důkladnější
+          # Simplified verification - in production it would be more thorough
           hash_a != recomputed
       end)
 
@@ -260,14 +260,14 @@ defmodule SpanChain.Agent do
   defp span_duration_ms(_), do: nil
 
   # ---------------------------------------------------------------------------
-  # Private: Task execution (placeholder → zde bude Anthropic API call)
+  # Private: Task execution (placeholder → the Anthropic API call will go here)
   # ---------------------------------------------------------------------------
 
   defp execute_task(task, state) when is_binary(task) do
-    # Simulace práce
+    # Simulate work
     Process.sleep(Enum.random(50..200))
 
-    # V produkci: volání Anthropic API přes Req
+    # In production: call the Anthropic API via Req
     # {:ok, response} = Req.post("https://api.anthropic.com/v1/messages", ...)
 
     "Agent #{state.name} completed: #{task}"

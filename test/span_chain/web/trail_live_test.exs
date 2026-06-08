@@ -1,12 +1,12 @@
 defmodule SpanChain.Web.TrailLiveTest do
   @moduledoc """
-  Real-time `/trail` auto-refresh přes Phoenix.PubSub (backlog #9 + #10).
+  Real-time `/trail` auto-refresh via Phoenix.PubSub (backlog #9 + #10).
 
-  Pipeline broadcastuje po úspěšném batch insertu — LiveView subscribuje
-  per route a re-fetchuje na příchozí zprávu. Testuje:
-    1. index `/trail` re-fetch na `{:run_updated, _}`
-    2. detail `/trail/:run_id` re-fetch na `{:spans_flushed, run_id}`
-    3. isolation — detail A neagreguje broadcast pro detail B
+  The Pipeline broadcasts after a successful batch insert — the LiveView subscribes
+  per route and re-fetches on an incoming message. Tests:
+    1. index `/trail` re-fetch on `{:run_updated, _}`
+    2. detail `/trail/:run_id` re-fetch on `{:spans_flushed, run_id}`
+    3. isolation — detail A doesn't pick up a broadcast for detail B
   """
 
   use SpanChain.DataCase, async: false
@@ -20,8 +20,8 @@ defmodule SpanChain.Web.TrailLiveTest do
 
   defp fresh_run_id, do: "trail-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower)
 
-  # Reuse pattern z pipeline_test.exs:16-50 — telemetry filter na run_ids
-  # v metadata izoluje events od paralelních happy-path testů.
+  # Reuse the pattern from pipeline_test.exs:16-50 — a telemetry filter on run_ids
+  # in the metadata isolates events from parallel happy-path tests.
   defp attach_flush_handler(run_id) do
     test_pid = self()
     ref = make_ref()
@@ -52,11 +52,11 @@ defmodule SpanChain.Web.TrailLiveTest do
 
       run_id = fresh_run_id()
       # Subscribe test process to "runs" same as LiveView. Phoenix.PubSub.broadcast
-      # iteruje subscribery a doručuje SYNC do všech mailboxů; když test dostane
-      # {:run_updated, _}, LiveView má zprávu už ve své mailbox → sync render(view)
-      # zpracuje handle_info DŘÍVE než vrátí state. Bez tohoto je race: telemetry
-      # [:gf, :ledger, :batch_insert, :stop] fire dřív než broadcast → test předběhne
-      # LiveView handle_info → render vrátí starý state.
+      # iterates subscribers and delivers SYNC into all mailboxes; when the test gets
+      # {:run_updated, _}, the LiveView already has the message in its mailbox → a sync render(view)
+      # processes handle_info BEFORE it returns state. Without this there's a race: the telemetry
+      # [:gf, :ledger, :batch_insert, :stop] fires before the broadcast → the test outruns the
+      # LiveView handle_info → render returns the old state.
       Phoenix.PubSub.subscribe(SpanChain.PubSub, "runs")
 
       :ok = ingest_one(run_id, "auto_refresh_index")
@@ -77,7 +77,7 @@ defmodule SpanChain.Web.TrailLiveTest do
       {:ok, view, html} = live(build_conn(), "/trail/#{run_id}")
       assert html =~ "1 ledger rows"
 
-      # Stejný anti-race trik jako index test — viz komentář tam.
+      # Same anti-race trick as the index test — see the comment there.
       Phoenix.PubSub.subscribe(SpanChain.PubSub, "run:#{run_id}")
       :ok = ingest_one(run_id, "second")
       assert_receive {:spans_flushed, ^run_id}, 2_000
@@ -99,17 +99,17 @@ defmodule SpanChain.Web.TrailLiveTest do
       {:ok, view, _initial_html} = live(build_conn(), "/trail/#{run_a}")
       html_before = render(view)
 
-      # Manuální broadcast pro JINÝ run_id — A subscribuje pouze na "run:RUN_A"
-      # → message pro run B nesmí dorazit do A LiveView.
+      # Manual broadcast for a DIFFERENT run_id — A subscribes only to "run:RUN_A"
+      # → a message for run B must not reach the A LiveView.
       Phoenix.PubSub.broadcast(
         SpanChain.PubSub,
         "run:#{run_b}",
         {:spans_flushed, run_b}
       )
 
-      # Test negativní hypotézy — dáme LiveView okno reagovat, kdyby chybně
-      # subscriboval na global topic. Žádný telemetry signál neexistuje pro
-      # "nic se nestalo", takže krátký sleep je nutné zlo.
+      # Testing a negative hypothesis — give the LiveView a window to react, in case it
+      # incorrectly subscribed to a global topic. There's no telemetry signal for
+      # "nothing happened", so a short sleep is a necessary evil.
       Process.sleep(50)
 
       html_after = render(view)

@@ -1,8 +1,8 @@
 defmodule SpanChain.Evals.ComparatorTest do
   @moduledoc """
-  Pure tree diff tests pro Evals.Comparator (GF-706). Insert spans přes
-  `Ledger.insert_batch/1` (žádný Pipeline, deterministic), Run/Eval rows
-  insertujeme přímo. async: false (DataCase shared sandbox).
+  Pure tree diff tests for Evals.Comparator (GF-706). Insert spans via
+  `Ledger.insert_batch/1` (no Pipeline, deterministic), Run/Eval rows
+  inserted directly. async: false (DataCase shared sandbox).
   """
 
   use SpanChain.DataCase, async: false
@@ -36,9 +36,9 @@ defmodule SpanChain.Evals.ComparatorTest do
     |> Repo.insert!()
   end
 
-  # Vytvoří span s ms-precision started_at/ended_at v payloadu pro reliable
-  # duration_ms výpočet (projekční sloupce mají second precision → loss při
-  # sub-second testech).
+  # Creates a span with ms-precision started_at/ended_at in the payload for a reliable
+  # duration_ms computation (the projection columns have second precision → loss in
+  # sub-second tests).
   defp span_entry(run_id, seq, event_type, opts \\ []) do
     duration_ms = Keyword.get(opts, :duration_ms, 100)
     parent_span_id = Keyword.get(opts, :parent_span_id)
@@ -59,7 +59,7 @@ defmodule SpanChain.Evals.ComparatorTest do
   defp prev_for_seq(0), do: nil
   defp prev_for_seq(_), do: "prev-stub"
 
-  # Helper: stejný tvar tree pro oba runy. Vrací mapu name → span_id pro
+  # Helper: the same tree shape for both runs. Returns a name → span_id map for
   # parent linking.
   defp insert_root_with_child(run_id, root_name, child_name, child_opts \\ []) do
     root_id = "root-#{run_id}"
@@ -88,7 +88,7 @@ defmodule SpanChain.Evals.ComparatorTest do
       ids_a = insert_root_with_child(run_a, "agent_run", "llm_call")
       ids_b = insert_root_with_child(run_b, "agent_run", "llm_call")
 
-      # B má grandchild "tool_call" pod "llm_call"
+      # B has a grandchild "tool_call" under "llm_call"
       grandchild =
         span_entry(run_b, 2, "tool_call",
           parent_span_id: ids_b.child,
@@ -112,7 +112,7 @@ defmodule SpanChain.Evals.ComparatorTest do
       insert_run(run_a)
       insert_run(run_b)
 
-      # A má root + child, B má jen root
+      # A has root + child, B has only root
       root_a_id = "root-#{run_a}"
       root_a = span_entry(run_a, 0, "agent_run", span_id: root_a_id)
       child_a = span_entry(run_a, 1, "llm_call", parent_span_id: root_a_id)
@@ -165,20 +165,20 @@ defmodule SpanChain.Evals.ComparatorTest do
       assert {:error, :run_not_found} = Comparator.compare("does-not-exist-a", "does-not-exist-b")
     end
 
-    # GF-740: previously `mark_deviation_points/1` označoval pouze index 0
-    # plochého diff listu — pokud agent měl 3 souběžné top-level větve a 2 z nich
-    # divergovaly, EvalLive ukázal marker jen u první větve. Po opravě každá
-    # top-level větev má vlastní first-diff marker.
+    # GF-740: previously `mark_deviation_points/1` marked only index 0
+    # of the flat diff list — if an agent had 3 concurrent top-level branches and 2 of them
+    # diverged, EvalLive showed the marker only on the first branch. After the fix each
+    # top-level branch has its own first-diff marker.
     test "GF-740: deviation_point per top-level branch, not global index 0" do
       run_a = fresh_run_id("a")
       run_b = fresh_run_id("b")
       insert_run(run_a)
       insert_run(run_b)
 
-      # 3 top-level kořeny (parent_span_id=nil) `branch_a`/`branch_b`/`branch_c`,
-      # každý má 1 list (`leaf_a`/`leaf_b`/`leaf_c`). V runu B `leaf_a` a `leaf_c`
-      # mají 5× delší duration → 2 duration_diff entries, každý v jiné top-level
-      # větvi → 2 deviation_points. `leaf_b` identický → branch_b žádný diff.
+      # 3 top-level roots (parent_span_id=nil) `branch_a`/`branch_b`/`branch_c`,
+      # each with 1 leaf (`leaf_a`/`leaf_b`/`leaf_c`). In run B `leaf_a` and `leaf_c`
+      # have 5× longer duration → 2 duration_diff entries, each in a different top-level
+      # branch → 2 deviation_points. `leaf_b` identical → branch_b no diff.
       build = fn run_id, da, db, dc ->
         [
           span_entry(run_id, 0, "branch_a", span_id: "br-a-#{run_id}"),
@@ -205,7 +205,7 @@ defmodule SpanChain.Evals.ComparatorTest do
       assert deviations |> Enum.map(& &1["span_name"]) |> Enum.sort() ==
                ["leaf_a", "leaf_c"]
 
-      # `leaf_b` v branch_b je identický → branch_b nevygeneruje žádný diff entry
+      # `leaf_b` in branch_b is identical → branch_b generates no diff entry
       refute Enum.any?(diffs, &(&1["span_name"] == "leaf_b"))
     end
 

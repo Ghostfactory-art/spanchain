@@ -1,5 +1,5 @@
 defmodule SpanChain.Web.ApiControllerTest do
-  @moduledoc "GF-789: JSON API endpointy + CORS (port 4001, /api scope)."
+  @moduledoc "GF-789: JSON API endpoints + CORS (port 4001, /api scope)."
 
   use SpanChain.DataCase, async: false
 
@@ -14,8 +14,8 @@ defmodule SpanChain.Web.ApiControllerTest do
 
   defp authed(conn), do: put_req_header(conn, "authorization", "Bearer #{@token}")
 
-  # Seed a run + valid 2-span hash chain (1 ok, 1 error) přímo do sandboxu.
-  # `eval_id` volitelně asociuje run s evaluací (GF-793 compare testy).
+  # Seed a run + valid 2-span hash chain (1 ok, 1 error) directly into the sandbox.
+  # `eval_id` optionally associates the run with an eval (GF-793 compare tests).
   defp seed_run(run_id, eval_id \\ nil) do
     Repo.insert!(%Run{
       run_id: run_id,
@@ -75,7 +75,7 @@ defmodule SpanChain.Web.ApiControllerTest do
     setup do
       Application.put_env(:span_chain, :rate_limit_enabled, true)
       Application.put_env(:span_chain, :rate_limit_count, 2)
-      # Oddělené buckety pro /api (per token) a /trail (per IP) — vyčisti mezi testy.
+      # Separate buckets for /api (per token) and /trail (per IP) — clean between tests.
       PlugAttack.Storage.Ets.clean(SpanChain.Web.RateLimiter.Api)
       PlugAttack.Storage.Ets.clean(SpanChain.Web.RateLimiter.Trail)
 
@@ -87,7 +87,7 @@ defmodule SpanChain.Web.ApiControllerTest do
       :ok
     end
 
-    test "/api per token — 3. request nad limit → 429 + Retry-After" do
+    test "/api per token — 3rd request over the limit → 429 + Retry-After" do
       assert build_conn() |> authed() |> get("/api/runs") |> Map.fetch!(:status) == 200
       assert build_conn() |> authed() |> get("/api/runs") |> Map.fetch!(:status) == 200
 
@@ -98,8 +98,8 @@ defmodule SpanChain.Web.ApiControllerTest do
       assert String.to_integer(retry_after) >= 1
     end
 
-    # Veřejné /trail (bez tokenu) throttluje per client IP přes x-forwarded-for (za Caddy).
-    test "/trail per IP (x-forwarded-for) — 3. request nad limit → 429" do
+    # The public /trail (no token) throttles per client IP via x-forwarded-for (behind Caddy).
+    test "/trail per IP (x-forwarded-for) — 3rd request over the limit → 429" do
       trail = fn ->
         build_conn()
         |> put_req_header("x-forwarded-for", "203.0.113.7")
@@ -111,13 +111,13 @@ defmodule SpanChain.Web.ApiControllerTest do
       assert trail.().status == 429
     end
 
-    # Oddělené ETS tabulky: vyčerpaný /api bucket nesmí throttlnout /trail (a naopak).
-    test "/api a /trail buckety jsou nezávislé" do
+    # Separate ETS tables: an exhausted /api bucket must not throttle /trail (and vice versa).
+    test "/api and /trail buckets are independent" do
       assert build_conn() |> authed() |> get("/api/runs") |> Map.fetch!(:status) == 200
       assert build_conn() |> authed() |> get("/api/runs") |> Map.fetch!(:status) == 200
       assert build_conn() |> authed() |> get("/api/runs") |> Map.fetch!(:status) == 429
 
-      # /trail bucket je netknutý → projde.
+      # The /trail bucket is untouched → it passes.
       conn = build_conn() |> put_req_header("x-forwarded-for", "198.51.100.9") |> get("/trail")
       assert conn.status == 200
     end
@@ -146,7 +146,7 @@ defmodule SpanChain.Web.ApiControllerTest do
       assert body["run"]["run_id"] == "api-run-2"
       assert length(body["spans"]) == 2
       assert Enum.all?(body["spans"], &(&1["started_at"] != nil))
-      # GF-793: span_id projekce přítomná v každém spanu (React staví strom).
+      # GF-793: the span_id projection is present in every span (React builds the tree).
       assert Enum.all?(body["spans"], &(&1["span_id"] != nil))
       assert Enum.sort(Enum.map(body["spans"], & &1["span_id"])) == ["s0", "s1"]
       refute Enum.any?(body["spans"], &Map.has_key?(&1, "payload"))
@@ -352,7 +352,7 @@ defmodule SpanChain.Web.ApiControllerTest do
         |> post("/api/cassettes/cas-850/replay", %{new_run_id: String.duplicate("a", 129)})
 
       assert json_response(conn, 400)["error"] == "invalid_run_id"
-      # Guard běží PŘED enqueue → žádný replay_job se nezaložil.
+      # The guard runs BEFORE enqueue → no replay_job was created.
       assert Repo.aggregate(from(j in ReplayJob, where: j.cassette_id == "cas-850"), :count) == 0
     end
 

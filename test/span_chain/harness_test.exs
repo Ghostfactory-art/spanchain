@@ -16,9 +16,9 @@ defmodule SpanChain.HarnessTest do
     {run_id, harness, session_pid, ref}
   end
 
-  # GF-667: flush_now/1 už neexistuje (Broadway async flush). Místo toho
-  # attachneme telemetry handler [:gf, :ledger, :batch_insert, :stop] před
-  # action a čekáme na cumulative count přes wait_for_flushed_count/3.
+  # GF-667: flush_now/1 no longer exists (Broadway async flush). Instead we
+  # attach the telemetry handler [:gf, :ledger, :batch_insert, :stop] before the
+  # action and wait for the cumulative count via wait_for_flushed_count/3.
   defp attach_flush_handler(test_pid) do
     ref = make_ref()
     handler_id = "harness-flush-#{inspect(ref)}"
@@ -53,7 +53,7 @@ defmodule SpanChain.HarnessTest do
     |> Repo.all()
   end
 
-  test "start_span + end_span: span se uloží do Ledgeru se správnými hodnotami" do
+  test "start_span + end_span: the span is stored in the Ledger with the correct values" do
     {run_id, harness, _, ref} = start_harness()
 
     {:ok, span_id} = Harness.start_span(harness, "llm_call", %{model: "claude-sonnet"})
@@ -74,7 +74,7 @@ defmodule SpanChain.HarnessTest do
     assert is_integer(row.payload["duration_ms"])
   end
 
-  test "with_span s úspěšnou funkcí: span uložen, výsledek vrácen transparentně" do
+  test "with_span with a successful function: span stored, result returned transparently" do
     {run_id, harness, _, ref} = start_harness()
 
     result = Harness.with_span(harness, "agent_run", %{task: "hello"}, fn -> "world" end)
@@ -91,7 +91,7 @@ defmodule SpanChain.HarnessTest do
     assert attrs["result"] == "\"world\""
   end
 
-  test "with_span s výjimkou: span uložen jako :error, výjimka je reraisována" do
+  test "with_span with an exception: span stored as :error, the exception is reraised" do
     {run_id, harness, _, ref} = start_harness()
 
     assert_raise RuntimeError, "boom", fn ->
@@ -108,7 +108,7 @@ defmodule SpanChain.HarnessTest do
     assert attrs["error"] =~ "boom"
   end
 
-  test "vnořené spany: parent_span_id přesně propojený přes explicitní argument" do
+  test "nested spans: parent_span_id linked exactly via the explicit argument" do
     {run_id, harness, _, ref} = start_harness()
 
     {:ok, parent_id} = Harness.start_span(harness, "agent_run", %{})
@@ -134,7 +134,7 @@ defmodule SpanChain.HarnessTest do
     assert parent_row.payload["span_id"] == parent_id
   end
 
-  test "stop/1: neukončené spany se persistují jako :abandoned" do
+  test "stop/1: unfinished spans are persisted as :abandoned" do
     {run_id, harness, _, ref} = start_harness()
 
     {:ok, closed_id} = Harness.start_span(harness, "ended_step", %{})

@@ -1,10 +1,10 @@
 defmodule SpanChain.Web.ApiController do
   @moduledoc """
-  Read-only JSON API pro Span Chain UI (GF-789), pod `/api` scope na portu 4001.
+  Read-only JSON API for the Span Chain UI (GF-789), under the `/api` scope on port 4001.
 
-  OOM-safe princip: list a skeleton endpointy NIKDY neselectují `payload` ani nedělají
-  JSONB extrakce — pouze nativní sloupce (GF-669/GF-790). Plný `payload` jde ven jen
-  v `get_span/2` (single row, on-demand).
+  OOM-safe principle: list and skeleton endpoints NEVER select `payload` or do
+  JSONB extraction — only native columns (GF-669/GF-790). The full `payload` goes out only
+  in `get_span/2` (single row, on-demand).
   """
 
   use Phoenix.Controller, formats: [:json]
@@ -15,8 +15,8 @@ defmodule SpanChain.Web.ApiController do
   alias SpanChain.{Cassettes, Evals, Ledger, Repo}
   alias SpanChain.Ingestion.ValidationPlug
 
-  # GF-850: validuj :run_id path param na read actions (port-4001 :api nemá ingest
-  # ValidationPlug). Reuse public valid_run_id?/1 — single-source regex contract (GF-774).
+  # GF-850: validate the :run_id path param on read actions (the port-4001 :api has no ingest
+  # ValidationPlug). Reuse the public valid_run_id?/1 — single-source regex contract (GF-774).
   plug(:validate_run_id when action in [:get_run, :get_span, :verify_run])
 
   # --------------------------------------------------------------------------
@@ -82,7 +82,7 @@ defmodule SpanChain.Web.ApiController do
         send_resp(conn, 404, "not found")
 
       meta ->
-        # Skeleton — payload záměrně vynechán (waterfall UI fetchne payload on-demand).
+        # Skeleton — payload deliberately omitted (the waterfall UI fetches the payload on-demand).
         spans =
           from(l in "ledger_entries",
             where: l.run_id == ^run_id,
@@ -92,7 +92,7 @@ defmodule SpanChain.Web.ApiController do
               epoch_id: l.epoch_id,
               event_type: l.event_type,
               hash: l.hash,
-              # GF-793: span_id projekce ven — React staví strom z parent_span_id → span_id.
+              # GF-793: expose the span_id projection — React builds the tree from parent_span_id → span_id.
               span_id: l.span_id,
               parent_span_id: l.parent_span_id,
               started_at: l.started_at,
@@ -113,7 +113,7 @@ defmodule SpanChain.Web.ApiController do
   def get_span(conn, %{"run_id" => run_id, "id" => id}) do
     case Integer.parse(id) do
       {span_pk, ""} ->
-        # Jediný endpoint kde payload (JSONB) jde ven — single row, on-demand.
+        # The only endpoint where the payload (JSONB) goes out — single row, on-demand.
         span =
           from(l in "ledger_entries",
             where: l.id == ^span_pk and l.run_id == ^run_id,
@@ -142,8 +142,8 @@ defmodule SpanChain.Web.ApiController do
   end
 
   def verify_run(conn, %{"run_id" => run_id}) do
-    # verify_ledger/1 vrací {:ok, count} | {:error, :chain_broken}. Neexistující
-    # run → {:ok, 0} (prázdný chain je validní), tj. žádný :not_found branch.
+    # verify_ledger/1 returns {:ok, count} | {:error, :chain_broken}. A nonexistent
+    # run → {:ok, 0} (an empty chain is valid), i.e. no :not_found branch.
     case Ledger.verify_ledger(run_id) do
       {:ok, count} ->
         json(conn, %{run_id: run_id, verified: true, span_count: count, error: nil})
@@ -154,7 +154,7 @@ defmodule SpanChain.Web.ApiController do
   end
 
   # --------------------------------------------------------------------------
-  # Evals (metadata only — Comparator.compare/2 se NEVOLÁ, je O(n) memory)
+  # Evals (metadata only — Comparator.compare/2 is NOT called, it is O(n) memory)
   # --------------------------------------------------------------------------
 
   def list_evals(conn, params) do
@@ -202,9 +202,9 @@ defmodule SpanChain.Web.ApiController do
   end
 
   @doc """
-  GF-793: porovná dva běhy v rámci evaluace přes `Evals.Comparator` (O(n),
-  pracuje jen s metadaty spanů — nedělá payload do response). Response mapuje
-  PŘESNĚ skutečný return type `compare/2`: `summary` + `differences` (NE verdict/diffs).
+  GF-793: compares two runs within an eval via `Evals.Comparator` (O(n),
+  works only with span metadata — no payload in the response). The response maps
+  EXACTLY the actual return type of `compare/2`: `summary` + `differences` (NOT verdict/diffs).
   """
   def compare_eval(conn, %{"id" => eval_id} = params) do
     run_a_id = params["run_a"]
@@ -243,7 +243,7 @@ defmodule SpanChain.Web.ApiController do
 
   def list_cassettes(conn, params) do
     with {:ok, limit, offset} <- fetch_pagination(params) do
-      # Přímý metadata dotaz (NE Cassettes.list/0 — to načítá celý `snapshot` array → OOM).
+      # A direct metadata query (NOT Cassettes.list/0 — that loads the whole `snapshot` array → OOM).
       cassettes =
         from(c in "cassettes",
           select: %{
@@ -273,8 +273,8 @@ defmodule SpanChain.Web.ApiController do
   Optional `new_run_id` param; otherwise a UUID-based replay run id is generated.
   """
   def replay_cassette(conn, %{"id" => cassette_id}) do
-    # GF-850: validuj jen user-dodaný new_run_id (generovaný fallback je trusted →
-    # žádná regrese na no-param replay). Malformed/oversized → 400 před enqueue.
+    # GF-850: validate only a user-supplied new_run_id (the generated fallback is trusted →
+    # no regression on no-param replay). Malformed/oversized → 400 before enqueue.
     supplied = Map.get(conn.params, "new_run_id")
 
     if is_binary(supplied) and not ValidationPlug.valid_run_id?(supplied) do
@@ -318,9 +318,9 @@ defmodule SpanChain.Web.ApiController do
   defp generate_replay_run_id(cassette_id), do: "replay-#{cassette_id}-#{Ecto.UUID.generate()}"
 
   # --------------------------------------------------------------------------
-  # CORS preflight — dead target. Corsica (první plug v :api) halt-ne allowed-origin
-  # preflight dřív; disallowed origin halt-ne AuthPlug (401). Route musí existovat,
-  # aby OPTIONS request prošel `:api` pipeline (jinak Phoenix 404 → Corsica se nespustí).
+  # CORS preflight — dead target. Corsica (the first plug in :api) halts an allowed-origin
+  # preflight first; a disallowed origin is halted by AuthPlug (401). The route must exist
+  # so the OPTIONS request passes through the `:api` pipeline (otherwise Phoenix 404 → Corsica won't run).
   # --------------------------------------------------------------------------
 
   def preflight(conn, _params), do: send_resp(conn, 204, "")
@@ -329,8 +329,8 @@ defmodule SpanChain.Web.ApiController do
   # Private
   # --------------------------------------------------------------------------
 
-  # GF-850: controller plug — odmítne malformed/oversized :run_id (399+ znaků, slash,
-  # nepovolené znaky) s 400 dřív, než action sáhne do DB. halt() zastaví dispatch.
+  # GF-850: controller plug — rejects a malformed/oversized :run_id (399+ chars, slash,
+  # disallowed characters) with 400 before the action touches the DB. halt() stops dispatch.
   defp validate_run_id(conn, _opts) do
     if ValidationPlug.valid_run_id?(conn.params["run_id"]) do
       conn

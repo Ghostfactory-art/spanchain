@@ -1,50 +1,50 @@
 defmodule SpanChain.Ingestion.SessionGenServer do
   @moduledoc """
-  Per-run_id stavový proces — hash-chain ledger pro jednu session.
+  Per-run_id stateful process — the hash-chain ledger for a single session.
 
-  ## Architektura po GF-751/GF-746
+  ## Architecture after GF-751/GF-746
 
-  SGS je **čistý in-memory hash-chain engine**: drží hash chain state
-  (`epoch_id`, `seq`, `prev_hash`) a per-run `eval_id` jako metadata.
-  Počítá hash pro každý příchozí span a okamžitě forwarduje hotové
-  entries do `BufferProducer` (GenStage producer Broadway pipeline).
+  The SGS is a **pure in-memory hash-chain engine**: it holds the hash chain state
+  (`epoch_id`, `seq`, `prev_hash`) and the per-run `eval_id` as metadata.
+  It computes the hash for each incoming span and immediately forwards the finished
+  entries to `BufferProducer` (the GenStage producer of the Broadway pipeline).
 
-  **Žádný DB přístup z tohoto modulu.** Veškerá persistence — `ledger_entries`,
-  `runs`, `evals` upserty — žije v `Pipeline.handle_batch/4` (GF-751
-  + GF-746). Prerekvizita pro Postgres přechod (GF-704): race condition
-  selhání jdou izolovat na jednu vrstvu změny.
+  **No DB access from this module.** All persistence — `ledger_entries`,
+  `runs`, `evals` upserts — lives in `Pipeline.handle_batch/4` (GF-751
+  + GF-746). A prerequisite for the Postgres migration (GF-704): race-condition
+  failures can be isolated to a single layer of change.
 
   ## Ordering guarantee
 
-  `ingest_spans/2` je `GenServer.call` (ne `cast`) — entries z jednoho POST
-  jdou do hash chainu atomicky v pořadí ze vstupní listy, paralelní volání
-  se serializují přes mailbox.
+  `ingest_spans/2` is a `GenServer.call` (not a `cast`) — entries from a single POST
+  go into the hash chain atomically in the order of the input list, and parallel calls
+  serialize through the mailbox.
 
-  Erlang FIFO mezi SGS a BufferProducer + Broadway `partition_by: run_id`
-  v processoru = DB insert pořadí per-run zachováno.
+  Erlang FIFO between the SGS and BufferProducer + Broadway `partition_by: run_id`
+  in the processor = per-run DB insert order is preserved.
 
   ## Eval association
 
-  `state.eval_id` se přilepí ke každému entry mapě jako in-memory metadata
-  field (`:eval_id`). Pipeline metadata fáze z něj derivuje `evals` upsert
-  a `runs.eval_id` update. `Ledger.insert_batch/1` field ignoruje (Pipeline
-  strippne před voláním — viz `pipeline.ex` handle_batch).
+  `state.eval_id` is attached to every entry map as an in-memory metadata
+  field (`:eval_id`). The Pipeline metadata phase derives the `evals` upsert
+  and the `runs.eval_id` update from it. `Ledger.insert_batch/1` ignores the field (the Pipeline
+  strips it before the call — see `pipeline.ex` handle_batch).
 
-  ## Co tu BÝVALO před GF-751/GF-746 a už není
+  ## What USED to be here before GF-751/GF-746 and no longer is
 
-  Best-effort upserty do `runs` (GF-669) a `evals` (GF-706) tabulek se
-  přesunuly do Pipeline metadata fází. Late-binding helper zůstává čistě
-  stavový (state mutation + telemetry), bez DB akce.
+  Best-effort upserts into the `runs` (GF-669) and `evals` (GF-706) tables
+  moved into the Pipeline metadata phases. The late-binding helper stays purely
+  stateful (state mutation + telemetry), with no DB action.
 
-  Batching, flushing, timery a retry logika se přesunula do `Pipeline` už v GF-667.
-  Test seamy `insert_fun` + `retry_delay_ms` byly odstraněny tamtéž.
+  Batching, flushing, timers, and the retry logic already moved into `Pipeline` in GF-667.
+  The `insert_fun` + `retry_delay_ms` test seams were removed there too.
   """
 
-  # GF-775: restart: :temporary — crashnutý SGS se NEauto-restartuje supervisorem
-  # (stará default :permanent restartovala se stale stavem epoch 0/prev_hash nil →
-  # corrupted chain, GF-768). Místo toho Registry zůstane prázdný a další ingest
-  # přes SessionSupervisor.ensure_session/1 provede recovery (epoch rollover +
-  # carried prev_hash) — recovery čte DB MIMO SGS, takže GF-751 (no Repo) drží.
+  # GF-775: restart: :temporary — a crashed SGS does NOT auto-restart via the supervisor
+  # (the old default :permanent restarted with stale state epoch 0/prev_hash nil →
+  # corrupted chain, GF-768). Instead the Registry stays empty and the next ingest
+  # via SessionSupervisor.ensure_session/1 performs recovery (epoch rollover +
+  # carried prev_hash) — recovery reads the DB OUTSIDE the SGS, so GF-751 (no Repo) holds.
   use GenServer, restart: :temporary
 
   alias SpanChain.Ledger
@@ -69,9 +69,9 @@ defmodule SpanChain.Ingestion.SessionGenServer do
   def start_link(opts) do
     run_id = Keyword.fetch!(opts, :run_id)
     eval_id = Keyword.get(opts, :eval_id)
-    # GF-775: epoch_id/prev_hash předány recovery cestou (ensure_session/1) po
-    # restartu. Defaulty (0 / nil) zachovávají chování pro nový run i pro callery,
-    # kteří je nepředávají (router, replayer, stress_test, testy).
+    # GF-775: epoch_id/prev_hash passed via the recovery path (ensure_session/1) after
+    # a restart. The defaults (0 / nil) preserve behavior for a new run and for callers
+    # that don't pass them (router, replayer, stress_test, tests).
     epoch_id = Keyword.get(opts, :epoch_id, 0)
     prev_hash = Keyword.get(opts, :prev_hash)
 
@@ -82,32 +82,32 @@ defmodule SpanChain.Ingestion.SessionGenServer do
     )
   end
 
-  @doc "Registry name pro `run_id`. Bezpečné volat i pro neexistující sessions."
+  @doc "Registry name for `run_id`. Safe to call even for nonexistent sessions."
   def via_tuple(run_id), do: {:via, Registry, {@registry, run_id}}
 
   @doc """
-  Sync dispatch spanů na session. Hashuje synchronně, forwarduje async do
-  Broadway pipeline. Vrací `{:ok, count}` kde `count` je počet zpracovaných
-  spanů, nebo `{:error, reason}` (session crash / timeout).
+  Sync dispatch of spans to the session. Hashes synchronously, forwards async to the
+  Broadway pipeline. Returns `{:ok, count}` where `count` is the number of processed
+  spans, or `{:error, reason}` (session crash / timeout).
 
-  Caller musí předtím `SessionSupervisor.ensure_session/1`.
+  The caller must first call `SessionSupervisor.ensure_session/1`.
   """
   @spec ingest_spans(String.t(), [map()]) ::
           {:ok, non_neg_integer()} | {:error, term()}
   def ingest_spans(run_id, spans) when is_list(spans), do: ingest_spans(run_id, spans, [])
 
   @doc """
-  GF-727: variant s `opts` pro per-call kontext. Aktuálně podporuje:
+  GF-727: a variant with `opts` for per-call context. Currently supports:
 
-    * `:eval_id` — late-binding pro již běžící SGS (init dostane `nil`,
-      pozdější OTLP batch dorazí s `gf.eval_id` v resource attrs).
-      Idempotentní: první eval_id vyhraje, další volání jsou no-op.
+    * `:eval_id` — late-binding for an already-running SGS (init receives `nil`,
+      a later OTLP batch arrives with `gf.eval_id` in the resource attrs).
+      Idempotent: the first eval_id wins, further calls are a no-op.
 
-  Po GF-751/GF-746 je late-binding čistě stavová operace — DB upsert
-  proběhne až při dalším Pipeline flushi přes `:eval_id` přilepený k entries.
+  After GF-751/GF-746 late-binding is a purely stateful operation — the DB upsert
+  happens on the next Pipeline flush via the `:eval_id` attached to the entries.
 
-  Public API `/2` zůstává beze změny pro `/ingest` JSON cestu (která eval_id
-  nepoužívá). Internal message má vždy tvar `{:ingest_spans, spans, opts}`.
+  The public API `/2` stays unchanged for the `/ingest` JSON path (which does not use
+  eval_id). The internal message always has the form `{:ingest_spans, spans, opts}`.
   """
   @spec ingest_spans(String.t(), [map()], keyword()) ::
           {:ok, non_neg_integer()} | {:error, term()}
@@ -119,7 +119,7 @@ defmodule SpanChain.Ingestion.SessionGenServer do
     end
   end
 
-  @doc "Vrátí stav (hash chain pozici) — pro testy a introspekci."
+  @doc "Returns the state (hash chain position) — for tests and introspection."
   def snapshot(run_id) do
     GenServer.call(via_tuple(run_id), :snapshot)
   end
@@ -130,9 +130,9 @@ defmodule SpanChain.Ingestion.SessionGenServer do
 
   @impl true
   def init(%{run_id: run_id, eval_id: eval_id, epoch_id: epoch_id, prev_hash: prev_hash}) do
-    # GF-775: epoch_id/prev_hash z recovery (ensure_session/1). seq vždy 0 —
-    # nová epocha má vlastní sekvence prostor; prev_hash navazuje na poslední
-    # commitnutý hash předchozí epochy (GF-666 cross-epoch kontinuita).
+    # GF-775: epoch_id/prev_hash from recovery (ensure_session/1). seq is always 0 —
+    # a new epoch has its own sequence space; prev_hash chains onto the last
+    # committed hash of the previous epoch (GF-666 cross-epoch continuity).
     {:ok, %{run_id: run_id, eval_id: eval_id, epoch_id: epoch_id, seq: 0, prev_hash: prev_hash}}
   end
 
@@ -156,9 +156,9 @@ defmodule SpanChain.Ingestion.SessionGenServer do
   # Private — pure hash chain builder
   # --------------------------------------------------------------------------
 
-  # Reduce přes spans, pro každý spočítá hash a aktualizuje seq+prev_hash.
-  # Vrací (entries, new_state) — žádný DB přístup, žádný timer, čistá funkce
-  # (jen state mutation skrz GenServer reduce).
+  # Reduce over the spans, computing a hash for each and updating seq+prev_hash.
+  # Returns (entries, new_state) — no DB access, no timer, a pure function
+  # (just state mutation through the GenServer reduce).
   defp build_entries(spans, state) do
     {entries_rev, final_state} =
       Enum.reduce(spans, {[], state}, fn span, {acc, st} ->
@@ -204,18 +204,18 @@ defmodule SpanChain.Ingestion.SessionGenServer do
       %{run_id: state.run_id, from_epoch: state.epoch_id, to_epoch: state.epoch_id + 1}
     )
 
-    # GF-666: prev_hash se zachovává přes epoch boundary — první záznam nové
-    # epochy navazuje na poslední hash předchozí epochy. Bez toho je verify_ledger/1
-    # imunní vůči smazání celé epochy (Island Attack).
+    # GF-666: prev_hash is preserved across the epoch boundary — the first record of the new
+    # epoch chains onto the last hash of the previous epoch. Without it verify_ledger/1
+    # is blind to the deletion of a whole epoch (Island Attack).
     %{state | epoch_id: state.epoch_id + 1, seq: 0, prev_hash: state.prev_hash}
   end
 
   defp maybe_epoch_boundary(state), do: state
 
-  # GF-727: late-binding pomocník. Volán z handle_call({:ingest_spans, _, opts}).
-  # First-wins: pokud state.eval_id už non-nil, ignoruj.
-  # Po GF-751/GF-746: čistě stavová operace + telemetry; DB upsert proběhne
-  # při dalším Pipeline flushi přes `:eval_id` přilepený k entries v append_span.
+  # GF-727: late-binding helper. Called from handle_call({:ingest_spans, _, opts}).
+  # First-wins: if state.eval_id is already non-nil, ignore.
+  # After GF-751/GF-746: a purely stateful operation + telemetry; the DB upsert happens
+  # on the next Pipeline flush via the `:eval_id` attached to the entries in append_span.
   defp maybe_apply_late_eval_id(state, nil), do: state
 
   defp maybe_apply_late_eval_id(%{eval_id: existing} = state, _new) when not is_nil(existing),

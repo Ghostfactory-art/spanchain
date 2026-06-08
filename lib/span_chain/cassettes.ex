@@ -1,9 +1,9 @@
 defmodule SpanChain.Cassettes do
   @moduledoc """
-  Public API pro Cassettes doménu (GF-712). Cassette = DB-backed snapshot
-  payload streamu pro daný `run_id`, replayovatelný přes
-  `SessionGenServer → Pipeline → Ledger` cestu (hash-chain invariant
-  zachován — žádný bypass).
+  Public API for the Cassettes domain (GF-712). A Cassette = a DB-backed snapshot
+  of the payload stream for a given `run_id`, replayable through the
+  `SessionGenServer → Pipeline → Ledger` path (the hash-chain invariant is
+  preserved — no bypass).
   """
 
   import Ecto.Query, only: [from: 2]
@@ -208,9 +208,9 @@ defmodule SpanChain.Cassettes do
     }
   end
 
-  # Payload-first: ukládáme raw `payload` mapu z Ledger rows (sub-second
-  # precision zachována, projekční sloupce truncated na :second by data
-  # zkreslily — lesson learned z GF-706 Comparator.duration_ms bug).
+  # Payload-first: we store the raw `payload` map from the Ledger rows (sub-second
+  # precision preserved; the projection columns truncated to :second would distort
+  # the data — lesson learned from the GF-706 Comparator.duration_ms bug).
   defp load_payloads(run_id) do
     from(l in Ledger,
       where: l.run_id == ^run_id,

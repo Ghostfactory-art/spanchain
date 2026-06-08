@@ -16,12 +16,12 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
 
   defp fresh_run_id, do: "run-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower)
 
-  # GF-703 / CLAUDE.md PubSub test pattern: post-commit broadcast firi AŽ PO
-  # Repo.transaction commit + connection release. Telemetry [:gf, :ledger,
-  # :batch_insert, :stop] firi UVNITR transakce → race s Broadway commit →
-  # Exqlite ConnectionError "owner exited" v logu. Caller MUSI subscribe PRED
-  # ingest_spans, pak volat wait_for_all_committed/3, a unsubscribe v after
-  # (typicky on_exit).
+  # GF-703 / CLAUDE.md PubSub test pattern: the post-commit broadcast fires only AFTER
+  # the Repo.transaction commit + connection release. Telemetry [:gf, :ledger,
+  # :batch_insert, :stop] fires INSIDE the transaction → races with the Broadway commit →
+  # Exqlite ConnectionError "owner exited" in the log. The caller MUST subscribe BEFORE
+  # ingest_spans, then call wait_for_all_committed/3, and unsubscribe afterward
+  # (typically on_exit).
   defp wait_for_all_committed(run_id, expected, timeout_ms \\ 10_000) do
     if count_committed(run_id) >= expected do
       :ok
@@ -77,7 +77,7 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
   end
 
   describe "epoch boundary" do
-    test "rolls over after 1000 events: epoch_id++, seq=0, prev_hash zachován (GF-666)" do
+    test "rolls over after 1000 events: epoch_id++, seq=0, prev_hash preserved (GF-666)" do
       run_id = fresh_run_id()
       {:ok, _pid} = SessionSupervisor.ensure_session(run_id)
 
@@ -90,8 +90,8 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
       snap = SessionGenServer.snapshot(run_id)
       assert snap.epoch_id == 1
       assert snap.seq == 0
-      # GF-666: prev_hash NESMÍ být nil po epoch rollover — musí navazovat
-      # na poslední hash předchozí epochy (jinak Island Attack projde verify).
+      # GF-666: prev_hash MUST NOT be nil after the epoch rollover — it must chain onto
+      # the last hash of the previous epoch (otherwise an Island Attack passes verify).
       assert is_binary(snap.prev_hash)
 
       :ok = wait_for_all_committed(run_id, 1000)
@@ -126,8 +126,8 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
       Phoenix.PubSub.subscribe(SpanChain.PubSub, "run:#{run_id}")
       on_exit(fn -> Phoenix.PubSub.unsubscribe(SpanChain.PubSub, "run:#{run_id}") end)
 
-      # GF-751: Run/Eval řádky vznikají AŽ po Pipeline flush (ne v SGS.init/1).
-      # Ingestnout 1 span a počkat na commit před DB asserty.
+      # GF-751: Run/Eval rows are created only AFTER the Pipeline flush (not in SGS.init/1).
+      # Ingest 1 span and wait for the commit before the DB asserts.
       {:ok, 1} = SessionGenServer.ingest_spans(run_id, [span("first")])
       :ok = wait_for_all_committed(run_id, 1)
 
@@ -148,7 +148,7 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
       Phoenix.PubSub.subscribe(SpanChain.PubSub, "run:#{run_id}")
       on_exit(fn -> Phoenix.PubSub.unsubscribe(SpanChain.PubSub, "run:#{run_id}") end)
 
-      # GF-751: Run řádek vzniká AŽ po Pipeline flush — bez ingest_spans nebude existovat.
+      # GF-751: the Run row is created only AFTER the Pipeline flush — without ingest_spans it won't exist.
       {:ok, 1} = SessionGenServer.ingest_spans(run_id, [span("first")])
       :ok = wait_for_all_committed(run_id, 1)
 
@@ -157,7 +157,7 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
       assert run.eval_id == nil
     end
 
-    test "GF-727 late-binding: nil eval_id v init → set via ingest_spans/3 opts" do
+    test "GF-727 late-binding: nil eval_id in init → set via ingest_spans/3 opts" do
       run_id = fresh_run_id()
       eval_id = "late-" <> Base.encode16(:crypto.strong_rand_bytes(4), case: :lower)
 
@@ -169,11 +169,11 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
 
       {:ok, 1} = SessionGenServer.ingest_spans(run_id, [span("late")], eval_id: eval_id)
 
-      # Snapshot je in-memory SGS state — viditelný okamžitě (GF-727 first-wins).
+      # The snapshot is in-memory SGS state — visible immediately (GF-727 first-wins).
       assert SessionGenServer.snapshot(run_id).eval_id == eval_id
 
-      # GF-751: DB visibility až po Pipeline flush. wait_for_all_committed MUSÍ
-      # přijít před Repo.get asserty.
+      # GF-751: DB visibility only after the Pipeline flush. wait_for_all_committed MUST
+      # come before the Repo.get asserts.
       :ok = wait_for_all_committed(run_id, 1)
 
       assert %Eval{} = Repo.get(Eval, eval_id)
@@ -195,14 +195,14 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
 
       assert SessionGenServer.snapshot(run_id).eval_id == first
 
-      # GF-751: wait před Repo.get assertem. COALESCE first-wins na runs.eval_id
-      # se uplatní v Pipeline.ensure_eval_records — i kdyby druhý batch dorazil
-      # s `second` (nedorazí, SGS state vrátí first), DB by ho ignorovala.
+      # GF-751: wait before the Repo.get assert. COALESCE first-wins on runs.eval_id
+      # applies in Pipeline.ensure_eval_records — even if a second batch arrived
+      # with `second` (it won't, the SGS state returns first), the DB would ignore it.
       :ok = wait_for_all_committed(run_id, 2)
       assert Repo.get(Run, run_id).eval_id == first
     end
 
-    test "GF-727 late-binding: nil opts ponechá state.eval_id nil" do
+    test "GF-727 late-binding: nil opts leaves state.eval_id nil" do
       run_id = fresh_run_id()
       {:ok, _pid} = SessionSupervisor.ensure_session(run_id)
 
@@ -219,7 +219,7 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
       assert Repo.get(Run, run_id).eval_id == nil
     end
 
-    test "GF-727 late-binding telemetry: [:gf, :sgs, :late_bind_eval_id] firi max 1x" do
+    test "GF-727 late-binding telemetry: [:gf, :sgs, :late_bind_eval_id] fires at most once" do
       run_id = fresh_run_id()
       eval_id = "once-" <> Base.encode16(:crypto.strong_rand_bytes(4), case: :lower)
 
@@ -250,24 +250,24 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
       :ok = wait_for_all_committed(run_id, 3)
     end
 
-    test "SGS nekrashne když Eval insert selže (sandbox-style sabotage)" do
-      # Tento test ověřuje resilience pattern, ne konkrétní fail mode.
-      # Use invalid eval_id length / shape je tricky bez schema constraint;
-      # místo toho spawn SGS s eval_id a verify že proces přežije (SGS init
-      # má try/rescue/catch — even pokud něco selže, vrátí :ok).
+    test "SGS does not crash when the Eval insert fails (sandbox-style sabotage)" do
+      # This test verifies the resilience pattern, not a specific fail mode.
+      # Using an invalid eval_id length / shape is tricky without a schema constraint;
+      # instead we spawn an SGS with an eval_id and verify the process survives (SGS init
+      # has try/rescue/catch — even if something fails, it returns :ok).
       run_id = fresh_run_id()
       eval_id = "eval-resilience-" <> Base.encode16(:crypto.strong_rand_bytes(4), case: :lower)
 
       {:ok, pid} = SessionSupervisor.ensure_session(run_id, eval_id: eval_id)
       assert Process.alive?(pid)
 
-      # Subscribe PRED prvnim ingest — jinak by prvni flush mohl race-ovat
-      # s sandbox cleanup (predchozi telemetry helper attach po prvnim ingest
-      # zachycoval jen druhy flush, prvni byl unsafe).
+      # Subscribe BEFORE the first ingest — otherwise the first flush could race
+      # with sandbox cleanup (the previous telemetry helper attach after the first ingest
+      # caught only the second flush; the first was unsafe).
       Phoenix.PubSub.subscribe(SpanChain.PubSub, "run:#{run_id}")
       on_exit(fn -> Phoenix.PubSub.unsubscribe(SpanChain.PubSub, "run:#{run_id}") end)
 
-      # Po init proces nadále reaguje na messages
+      # After init the process keeps responding to messages
       assert {:ok, 1} = SessionGenServer.ingest_spans(run_id, [%{"name" => "after_init"}])
       assert Process.alive?(pid)
 
@@ -277,14 +277,14 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
   end
 
   # ---------------------------------------------------------------------------
-  # GF-775: crash recovery IMPLEMENTOVÁNA (dříve GF-768 charakterizace bugu).
+  # GF-775: crash recovery IMPLEMENTED (previously GF-768 bug characterization).
   #
-  # SGS je restart: :temporary → crash NEauto-restartuje. Další ingest přes
-  # SessionSupervisor.ensure_session/1 provede recovery MIMO SGS (GF-751 drží):
-  # přečte z DB poslední epoch + hash, spawn s epoch_id+1 a carried prev_hash.
-  # Epoch rollover = vlastní sekvence prostor (žádná kolize s in-flight starými
-  # spany), carried prev_hash = GF-666 cross-epoch kontinuita → verify_ledger
-  # zůstane {:ok, _}. Detaily: docs/crash-recovery-2026-05-26.md (audit).
+  # The SGS is restart: :temporary → a crash does NOT auto-restart. The next ingest via
+  # SessionSupervisor.ensure_session/1 performs recovery OUTSIDE the SGS (GF-751 holds):
+  # it reads the last epoch + hash from the DB, spawns with epoch_id+1 and a carried prev_hash.
+  # The epoch rollover = its own sequence space (no collision with in-flight old
+  # spans), the carried prev_hash = GF-666 cross-epoch continuity → verify_ledger
+  # stays {:ok, _}. Details: docs/crash-recovery-2026-05-26.md (audit).
   # ---------------------------------------------------------------------------
   describe "crash recovery (GF-775)" do
     test "restart rolls epoch + carries prev_hash → chain stays valid" do
@@ -292,7 +292,7 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
       Phoenix.PubSub.subscribe(SpanChain.PubSub, "run:#{run_id}")
       on_exit(fn -> Phoenix.PubSub.unsubscribe(SpanChain.PubSub, "run:#{run_id}") end)
 
-      # 1. Session + 5 spanů (epoch 0, seq 0–4) → flush. Chain v DB validní.
+      # 1. Session + 5 spans (epoch 0, seq 0–4) → flush. The chain in the DB is valid.
       {:ok, pid1} = SessionSupervisor.ensure_session(run_id)
       {:ok, 5} = SessionGenServer.ingest_spans(run_id, for(i <- 1..5, do: span("pre#{i}")))
       :ok = wait_for_all_committed(run_id, 5)
@@ -300,16 +300,16 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
       assert {:ok, 5} = Ledger.verify_ledger(run_id)
       assert SessionGenServer.snapshot(run_id).seq == 5
 
-      # 2. Crash SGS. restart: :temporary → supervisor ho NEauto-restartuje.
+      # 2. Crash the SGS. restart: :temporary → the supervisor does NOT auto-restart it.
       ref = Process.monitor(pid1)
       Process.exit(pid1, :kill)
       assert_receive {:DOWN, ^ref, :process, ^pid1, _}, 1_000
 
-      # 3. Registry se vyprázdní (žádný auto-restart) — ověř bounded pollem.
+      # 3. The Registry empties (no auto-restart) — verify with a bounded poll.
       assert await_registry_empty(run_id)
 
-      # 4. Recovery přes ensure_session/1: drain staré epochy (PubSub epoch_flush),
-      #    pak spawn s epoch_id+1 a prev_hash z DB (GF-666 cross-epoch kontinuita).
+      # 4. Recovery via ensure_session/1: drain the old epoch (PubSub epoch_flush),
+      #    then spawn with epoch_id+1 and prev_hash from the DB (GF-666 cross-epoch continuity).
       {:ok, pid2} = SessionSupervisor.ensure_session(run_id)
       assert pid2 != pid1
       assert Process.alive?(pid2)
@@ -319,45 +319,45 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
       assert snap.seq == 0
       assert snap.prev_hash != nil
 
-      # 5. 6 nových spanů jdou do epochy 1 (seq 0–5) — vlastní sekvence prostor,
-      #    žádná kolize se starou epochou na (run_id, epoch_id, seq).
+      # 5. 6 new spans go into epoch 1 (seq 0–5) — their own sequence space,
+      #    no collision with the old epoch on (run_id, epoch_id, seq).
       {:ok, 6} = SessionGenServer.ingest_spans(run_id, for(i <- 1..6, do: span("post#{i}")))
       :ok = wait_for_all_committed(run_id, 11)
       assert count_committed(run_id) == 11
 
-      # 6. GF-775: crash recovery implementována — epoch rollover + carried
-      #    prev_hash garantuje chain kontinuitu přes restart.
+      # 6. GF-775: crash recovery implemented — the epoch rollover + carried
+      #    prev_hash guarantees chain continuity across the restart.
       assert {:ok, 11} = Ledger.verify_ledger(run_id)
     end
 
-    # GF-782: multi-batch (4×50) recovery regrese. Větší prior epocha cvičí
-    # drain-until-silence v await_epoch_drain. Pozn.: čekáme na commit všech 200
-    # PŘED killem (deterministicky), takže crash nezachytí in-flight batche —
-    # in-flight drain race je inherentně timing-dependent a nelze deterministicky
-    # reprodukovat bez flaky testu. Tohle je correctness regrese (chain validní
-    # přes 4-batch epochu); samotný fix je drain_until_silence/3.
-    test "recovery po crashi se 4 in-flight batchy zachová hash-chain integritu" do
+    # GF-782: multi-batch (4×50) recovery regression. A larger prior epoch exercises
+    # drain-until-silence in await_epoch_drain. Note: we wait for all 200 to commit
+    # BEFORE the kill (deterministically), so the crash doesn't catch in-flight batches —
+    # the in-flight drain race is inherently timing-dependent and cannot be deterministically
+    # reproduced without a flaky test. This is a correctness regression (the chain is valid
+    # across a 4-batch epoch); the fix itself is drain_until_silence/3.
+    test "recovery after a crash with 4 in-flight batches preserves hash-chain integrity" do
       run_id =
         "multi-batch-recovery-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower)
 
       Phoenix.PubSub.subscribe(SpanChain.PubSub, "run:#{run_id}")
       on_exit(fn -> Phoenix.PubSub.unsubscribe(SpanChain.PubSub, "run:#{run_id}") end)
 
-      # 1. 200 spanů = 4 batche × 50 (epoch 0). Počkej na commit všech.
+      # 1. 200 spans = 4 batches × 50 (epoch 0). Wait for all to commit.
       {:ok, pid} = SessionSupervisor.ensure_session(run_id)
       {:ok, 200} = SessionGenServer.ingest_spans(run_id, for(i <- 1..200, do: span("pre#{i}")))
       :ok = wait_for_all_committed(run_id, 200)
       assert count_committed(run_id) == 200
       assert {:ok, 200} = Ledger.verify_ledger(run_id)
 
-      # 2. Crash + ověř že :temporary SGS se NEauto-restartuje.
+      # 2. Crash + verify the :temporary SGS does NOT auto-restart.
       ref = Process.monitor(pid)
       Process.exit(pid, :kill)
       assert_receive {:DOWN, ^ref, :process, ^pid, _}, 1_000
       assert await_registry_empty(run_id)
 
-      # 3. Recovery přes ensure_session/1 (NE ingest_spans — to jen GenServer.call):
-      #    drain staré epochy + spawn epoch 1 s carried prev_hash. Pak 10 spanů.
+      # 3. Recovery via ensure_session/1 (NOT ingest_spans — that's just a GenServer.call):
+      #    drain the old epoch + spawn epoch 1 with a carried prev_hash. Then 10 spans.
       {:ok, pid2} = SessionSupervisor.ensure_session(run_id)
       assert pid2 != pid
       snap = SessionGenServer.snapshot(run_id)
@@ -368,13 +368,13 @@ defmodule SpanChain.Ingestion.SessionGenServerTest do
       :ok = wait_for_all_committed(run_id, 210)
       assert count_committed(run_id) == 210
 
-      # 4. GF-666 cross-epoch kontinuita zachována přes 4-batch prior epochu.
+      # 4. GF-666 cross-epoch continuity preserved across the 4-batch prior epoch.
       assert {:ok, 210} = Ledger.verify_ledger(run_id)
     end
   end
 
-  # GF-775: bounded poll až je Registry prázdný (crashnutý :temporary SGS se
-  # NEauto-restartuje). receive/after pro yield mezi lookupy, žádný Process.sleep.
+  # GF-775: bounded poll until the Registry is empty (a crashed :temporary SGS does
+  # NOT auto-restart). receive/after to yield between lookups, no Process.sleep.
   defp await_registry_empty(run_id, retries \\ 200) do
     case Registry.lookup(SpanChain.Ingestion.SessionRegistry, run_id) do
       [] ->

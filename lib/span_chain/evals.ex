@@ -1,10 +1,10 @@
 defmodule SpanChain.Evals do
   @moduledoc """
-  Public API pro Evals doménu (GF-706). Eval je zastřešující agregát pro
-  porovnávání více `runs` se stejným záměrem.
+  Public API for the Evals domain (GF-706). An Eval is an umbrella aggregate for
+  comparing multiple `runs` with the same intent.
 
-  Závisí na `SpanChain.Eval` schema + `SpanChain.Run.eval_id` FK.
-  Compare funkce deleguje na `SpanChain.Evals.Comparator` (pure logika).
+  Depends on the `SpanChain.Eval` schema + the `SpanChain.Run.eval_id` FK.
+  The compare function delegates to `SpanChain.Evals.Comparator` (pure logic).
   """
 
   import Ecto.Query

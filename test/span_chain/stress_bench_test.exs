@@ -1,19 +1,19 @@
 defmodule SpanChain.StressBenchTest do
   @moduledoc """
-  GF-773/GF-772 stress benchmark — smoke ověření bench cesty.
+  GF-773/GF-772 stress benchmark — a smoke check of the bench path.
 
-  `@moduletag :stress` drží tenhle modul MIMO default `mix test` suite
-  (`ExUnit.configure(exclude: [:stress])` v `test_helper.exs`). Spusť ručně:
+  `@moduletag :stress` keeps this module OUT of the default `mix test` suite
+  (`ExUnit.configure(exclude: [:stress])` in `test_helper.exs`). Run it manually:
 
       mix test test/span_chain/stress_bench_test.exs --include stress --timeout 120000
 
-  Reálná čísla pro landing page se NEMĚŘÍ tady — test env běží v Sandboxu
-  (savepoint commity bez fsync = nadhodnocený throughput, batch_timeout 50ms).
-  Publikovaná čísla pocházejí z DEV env (reálná WAL DB, 1000ms timeout):
+  Real numbers for the landing page are NOT measured here — the test env runs in the Sandbox
+  (savepoint commits without fsync = overstated throughput, batch_timeout 50ms).
+  The published numbers come from the DEV env (real WAL DB, 1000ms timeout):
 
       mix run -e "SpanChain.StressTest.bench_report()"
 
-  Tenhle test jen ověří, že bench funkce nepadají na malém běhu.
+  This test only verifies that the bench functions don't crash on a small run.
   """
   use SpanChain.DataCase, async: false
 

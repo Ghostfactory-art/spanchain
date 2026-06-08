@@ -1,9 +1,9 @@
 defmodule SpanChain.RunTest do
   @moduledoc """
-  Schema smoke test pro `runs` table — GF-748 ověřuje gf.agent.* projection
-  fieldy (system_prompt_hash, temperature, version) po migraci. Verifikuje
-  roundtrip insert → get bez chyb (mock pro fakt že migrace + schema field
-  declarations jsou v synced stavu).
+  Schema smoke test for the `runs` table — GF-748 verifies the gf.agent.* projection
+  fields (system_prompt_hash, temperature, version) after the migration. Verifies a
+  roundtrip insert → get without errors (a proxy for the fact that the migration + schema field
+  declarations are in sync).
   """
 
   use SpanChain.DataCase, async: false
@@ -27,7 +27,7 @@ defmodule SpanChain.RunTest do
     assert loaded.system_prompt_hash == "deadbeef12345678"
     assert loaded.temperature == 0.5
     assert loaded.version == "v2"
-    # Existing fieldy zůstávají dostupné (sanity check že migrace nezničila schema)
+    # Existing fields stay available (sanity check that the migration didn't destroy the schema)
     assert loaded.status == "running"
     assert is_nil(loaded.model)
   end

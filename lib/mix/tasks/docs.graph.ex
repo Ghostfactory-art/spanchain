@@ -1,18 +1,18 @@
 defmodule Mix.Tasks.Docs.Graph do
   @moduledoc """
-  Generuje Obsidian `.md` soubory s `[[wikilinks]]` z `mix xref graph`.
+  Generates Obsidian `.md` files with `[[wikilinks]]` from `mix xref graph`.
 
-  Pro každý modul vytvoří soubor v `docs/graph/` se sekcemi
-  „Depends on" a „Depended on by", takže Obsidian graph view ukáže
-  živou závislostní strukturu (na rozdíl od manuálně udržovaného
-  `docs/architecture-map.md` sekce 4).
+  For each module it creates a file in `docs/graph/` with "Depends on"
+  and "Depended on by" sections, so the Obsidian graph view shows the
+  live dependency structure (unlike the manually maintained
+  `docs/architecture-map.md` section 4).
 
-  Spuštění: `mix docs.graph`
+  Run: `mix docs.graph`
   """
 
   use Mix.Task
 
-  @shortdoc "Generuje Obsidian wikilinks z mix xref graph"
+  @shortdoc "Generates Obsidian wikilinks from mix xref graph"
   @output_dir "docs/graph"
   @xref_dot_path "_build/docs_graph_xref.dot"
 

@@ -1,11 +1,11 @@
 defmodule SpanChain.CassettesTest do
   @moduledoc """
-  Context tests pro `SpanChain.Cassettes` (GF-712). Insertujeme spans
-  přes Pipeline (BufferProducer → Broadway), čekáme na `:gf, :ledger,
-  :batch_insert, :stop` telemetry (filter na run_id) než ověříme cassette.
+  Context tests for `SpanChain.Cassettes` (GF-712). We insert spans
+  via the Pipeline (BufferProducer → Broadway) and wait for the `:gf, :ledger,
+  :batch_insert, :stop` telemetry (filtered on run_id) before verifying the cassette.
 
-  Replay test: subscribuje na `"run:replay-..."` topic PŘED `replay/1`
-  a verifikuje hash chain + diff přes Comparator.
+  Replay test: subscribes to the `"run:replay-..."` topic BEFORE `replay/1`
+  and verifies the hash chain + diff via the Comparator.
   """
 
   use SpanChain.DataCase, async: false

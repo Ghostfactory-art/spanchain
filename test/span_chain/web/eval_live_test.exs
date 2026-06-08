@@ -1,7 +1,7 @@
 defmodule SpanChain.Web.EvalLiveTest do
   @moduledoc """
-  LiveView testy pro `/eval/:eval_id` — run selection + Comparator diff render
-  (GF-707). Žádná Broadway účast (Comparator čte přímo z Ledger), tudíž žádný
+  LiveView tests for `/eval/:eval_id` — run selection + Comparator diff render
+  (GF-707). No Broadway involvement (the Comparator reads directly from the Ledger), so no
   PubSub / telemetry flush wait pattern.
   """
 

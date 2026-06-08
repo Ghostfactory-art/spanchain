@@ -1,5 +1,5 @@
 defmodule SpanChain.Ledger do
-  @moduledoc "Append-only hash-chain Ledger — persistovaný OTLP span audit trail."
+  @moduledoc "Append-only hash-chain Ledger — a persisted OTLP span audit trail."
 
   @behaviour SpanChain.Ledger.Behaviour
 
@@ -50,15 +50,15 @@ defmodule SpanChain.Ledger do
     field(:hash, :string)
     field(:prev_hash, :string)
     field(:parent_span_id, :string)
-    # GF-669: projekce z payloadu pro rychlé čtení. Nejsou v compute_hash —
-    # payload je stále autoritativní zdroj pro integritu chainu.
+    # GF-669: projections from the payload for fast reads. Not in compute_hash —
+    # the payload is still the authoritative source for chain integrity.
     field(:span_id, :string)
-    # GF-653: trace_id projection pro W3C OTel korelace (GF-735 future). Není v hashi.
+    # GF-653: trace_id projection for W3C OTel correlation (GF-735 future). Not in the hash.
     field(:trace_id, :string)
     field(:started_at, :utc_datetime)
     field(:ended_at, :utc_datetime)
-    # GF-790: status projekce z payloadu (per-span status pro waterfall error highlight).
-    # Není v compute_hash — projekce, ne content (stejně jako span_id/trace_id). Nullable.
+    # GF-790: status projection from the payload (per-span status for waterfall error highlight).
+    # Not in compute_hash — a projection, not content (like span_id/trace_id). Nullable.
     field(:status, :string)
     field(:event_type, :string)
     field(:payload, :map, default: %{})
@@ -71,14 +71,14 @@ defmodule SpanChain.Ledger do
   # --------------------------------------------------------------------------
 
   @doc """
-  SHA256 hash for a single ledger entry. Vstup zahrnuje `run_id` a `epoch_id`
-  (GF-787) — entry je tak kryptograficky vázána ke svému runu a epoše, ne jen
-  SQL filtrem ve `verify_ledger/1`. Bez nich šlo entry potichu přesunout pod
-  jiný `run_id`/`epoch_id` v DB bez detekce.
+  SHA256 hash for a single ledger entry. The input includes `run_id` and `epoch_id`
+  (GF-787) — so the entry is cryptographically bound to its run and epoch, not just
+  by the SQL filter in `verify_ledger/1`. Without them an entry could be silently moved
+  under a different `run_id`/`epoch_id` in the DB without detection.
 
-  `run_id`/`epoch_id` jsou NOT NULL — žádný `|| "nil"` fallback. `parent_span_id`
-  patří do hashu (hierarchie), jinak by se dal potichu přepsat; `nil` se hashuje
-  jako literál `"nil"` (stejně jako `prev_hash`).
+  `run_id`/`epoch_id` are NOT NULL — no `|| "nil"` fallback. `parent_span_id`
+  belongs in the hash (hierarchy), otherwise it could be silently overwritten; `nil` is hashed
+  as the literal `"nil"` (like `prev_hash`).
   """
   @spec compute_hash(
           non_neg_integer(),
@@ -97,8 +97,8 @@ defmodule SpanChain.Ledger do
   end
 
   @doc """
-  Sestaví ledger entry s vypočítaným hashem. Volá ji SessionGenServer při
-  každém příchozím spanu.
+  Builds a ledger entry with the computed hash. Called by the SessionGenServer on
+  every incoming span.
   """
   @spec build_entry(
           String.t(),
@@ -110,10 +110,10 @@ defmodule SpanChain.Ledger do
           String.t() | nil
         ) :: entry()
   def build_entry(run_id, epoch_id, seq, prev_hash, event_type, payload, parent_span_id \\ nil) do
-    # GF-653 audit (Scénář A): OtlpTranslator emituje snake_case
-    # (`"span_id"`, `"trace_id"`) — span_id projekce je proto správně
-    # plněná i pro OTLP cestu, žádný fix nepotřeba. `|| "traceId"` fallback
-    # je defenzivní pro neidentifikované zdroje payloadu.
+    # GF-653 audit (Scenario A): OtlpTranslator emits snake_case
+    # (`"span_id"`, `"trace_id"`) — so the span_id projection is correctly
+    # populated for the OTLP path too, no fix needed. The `|| "traceId"` fallback
+    # is defensive for unidentified payload sources.
     %{
       run_id: run_id,
       epoch_id: epoch_id,
@@ -125,7 +125,7 @@ defmodule SpanChain.Ledger do
       trace_id: Map.get(payload, "trace_id") || Map.get(payload, "traceId"),
       started_at: parse_datetime(Map.get(payload, "started_at")),
       ended_at: parse_datetime(Map.get(payload, "ended_at")),
-      # GF-790: status projekce — po compute_hash, hash vstup beze změny.
+      # GF-790: status projection — after compute_hash, hash input unchanged.
       status: Map.get(payload, "status"),
       event_type: event_type,
       payload: payload,
@@ -133,8 +133,8 @@ defmodule SpanChain.Ledger do
     }
   end
 
-  # GF-669: defenzivní ISO8601 parser. Nikdy nespadne — non-binary / non-parseable
-  # vstup vrátí nil. Projekční sloupce jsou nullable; chyba v parsu nesmí blokovat ingesci.
+  # GF-669: defensive ISO8601 parser. Never crashes — non-binary / non-parseable
+  # input returns nil. The projection columns are nullable; a parse error must not block ingestion.
   defp parse_datetime(nil), do: nil
 
   defp parse_datetime(str) when is_binary(str) do
@@ -151,9 +151,9 @@ defmodule SpanChain.Ledger do
   # --------------------------------------------------------------------------
 
   @doc """
-  Batch insert ledger záznamů. Idempotentní díky on_conflict: :nothing
-  na uniq index (run_id, epoch_id, seq). Emituje :telemetry event
-  `[:gf, :ledger, :batch_insert, :start | :stop]` s `count` v measurements.
+  Batch insert of ledger records. Idempotent thanks to on_conflict: :nothing
+  on the unique index (run_id, epoch_id, seq). Emits the :telemetry event
+  `[:gf, :ledger, :batch_insert, :start | :stop]` with `count` in measurements.
   """
   @spec insert_batch([entry()]) :: {non_neg_integer(), nil | [term()]}
   def insert_batch([]), do: {0, nil}
@@ -190,17 +190,17 @@ defmodule SpanChain.Ledger do
   # --------------------------------------------------------------------------
 
   @doc """
-  Re-hashes the chain from DB end-to-end. Returns `{:ok, count}` pokud
-  každý záznam (a) má `hash` shodný s recomputed value a (b) `prev_hash`
-  shodný s hashem bezprostředně předchozího záznamu — plynule přes
-  všechny epochy. Vrátí `{:error, :chain_broken}` jinak.
+  Re-hashes the chain from DB end-to-end. Returns `{:ok, count}` if
+  every record (a) has a `hash` matching the recomputed value and (b) a `prev_hash`
+  matching the hash of the immediately preceding record — seamlessly across
+  all epochs. Returns `{:error, :chain_broken}` otherwise.
 
-  GF-666: epoch hranice NENÍ zvláštní případ. `last_hash` se přenáší
-  napříč epochami; smazání celé epochy uprostřed chainu se projeví jako
-  rozpor `entry.prev_hash != last_hash` u prvního záznamu následující
-  epochy a vrátí `{:error, :chain_broken}` (Island Attack detection).
+  GF-666: the epoch boundary is NOT a special case. `last_hash` carries
+  across epochs; deleting a whole epoch in the middle of the chain shows up as
+  the discrepancy `entry.prev_hash != last_hash` at the first record of the following
+  epoch and returns `{:error, :chain_broken}` (Island Attack detection).
 
-  `prev_hash: nil` je povoleno pouze pro úplně první záznam v rámci
+  `prev_hash: nil` is allowed only for the very first record within a
   `run_id` (`epoch_id: 0, seq: 0`).
   """
   @spec verify_ledger(String.t()) :: {:ok, non_neg_integer()} | {:error, :chain_broken}

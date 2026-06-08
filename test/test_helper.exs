@@ -1,7 +1,7 @@
 Ecto.Adapters.SQL.Sandbox.mode(SpanChain.Repo, :manual)
 ExUnit.start()
 
-# GF-773: stress/bench testy se NEspouští v default suite (timeout v CI). Spusť je
-# manuálně přes `mix test --include stress` nebo reálná dev-env čísla přes
+# GF-773: stress/bench tests do NOT run in the default suite (timeout in CI). Run them
+# manually via `mix test --include stress`, or real dev-env numbers via
 # `mix run -e "SpanChain.StressTest.bench_report()"`.
 ExUnit.configure(exclude: [:stress])

@@ -1,34 +1,34 @@
 defmodule SpanChain.Ingestion.Pipeline do
   @moduledoc """
-  Broadway pipeline pro asynchronní persistenci Ledger entries (GF-667).
+  Broadway pipeline for asynchronous persistence of Ledger entries (GF-667).
 
-  Konzumuje messages z `BufferProducer` (nebo `Broadway.DummyProducer` v testech)
-  a batchovaně volá `Ledger.insert_batch/1`. Při selhání retry 3× s exponenciálním
-  backoffem (zachovává GF-645 sémantiku, jen přesunutou z SessionGenServer).
+  Consumes messages from `BufferProducer` (or `Broadway.DummyProducer` in tests)
+  and calls `Ledger.insert_batch/1` in batches. On failure it retries 3× with exponential
+  backoff (preserves the GF-645 semantics, just moved out of SessionGenServer).
 
   ## Ordering / partitioning (GF-779)
 
-  Batcher používá `partition_by: fn msg -> :erlang.phash2(msg.data.run_id) end` —
-  stejný `run_id` jde vždy do stejné batcher partition (per-session lokalita),
-  různé `run_id`s běží paralelně (cross-session souběžnost na Postgres MVCC).
-  MUSÍ hashovat: Broadway počítá `rem(func.(msg), concurrency)`, bare string
-  `run_id` by spadl na `ArithmeticError`. Hash-chain integrita na DB insert
-  pořadí nezávisí (počítá se in-memory v `SessionGenServer`; `verify_ledger`
-  čte `order_by: seq`).
+  The batcher uses `partition_by: fn msg -> :erlang.phash2(msg.data.run_id) end` —
+  the same `run_id` always goes to the same batcher partition (per-session locality),
+  different `run_id`s run in parallel (cross-session concurrency on Postgres MVCC).
+  It MUST hash: Broadway computes `rem(func.(msg), concurrency)`, a bare string
+  `run_id` would crash with `ArithmeticError`. Hash-chain integrity does not depend on
+  DB insert order (it is computed in-memory in `SessionGenServer`; `verify_ledger`
+  reads `order_by: seq`).
 
   ## Concurrency (GF-779, post-Postgres GF-704)
 
-  Procesory `concurrency: System.schedulers_online()`, batcher `concurrency: 4`.
-  Producer zůstává `concurrency: 1` (Registry singleton). Postgres MVCC nahradil
-  SQLite single-writer limit. **Test env je pinováno na 1** přes seamy
-  `:broadway_processor_concurrency` / `:broadway_batcher_concurrency`.
+  Processors `concurrency: System.schedulers_online()`, batcher `concurrency: 4`.
+  The producer stays `concurrency: 1` (Registry singleton). Postgres MVCC replaced the
+  SQLite single-writer limit. **The test env is pinned to 1** via the
+  `:broadway_processor_concurrency` / `:broadway_batcher_concurrency` seams.
 
-  ## Konfigurace přes Application env
+  ## Configuration via Application env
 
-  - `:broadway_producer_module` — `BufferProducer` (prod/dev) nebo
-    `Broadway.DummyProducer` (test, umožňuje `Broadway.test_message/3`)
+  - `:broadway_producer_module` — `BufferProducer` (prod/dev) or
+    `Broadway.DummyProducer` (test, enables `Broadway.test_message/3`)
   - `:broadway_batch_timeout_ms` — 100ms (prod/dev, GF-777) / 50ms (test);
-    prod laditelný přes `BATCH_FLUSH_TIMEOUT_MS` env var (config/runtime.exs)
+    tunable in prod via the `BATCH_FLUSH_TIMEOUT_MS` env var (config/runtime.exs)
   - `:broadway_processor_concurrency` — default `System.schedulers_online()` / 1 (test)
   - `:broadway_batcher_concurrency` — default 4 / 1 (test)
   """
@@ -47,11 +47,11 @@ defmodule SpanChain.Ingestion.Pipeline do
     producer_module =
       Application.fetch_env!(:span_chain, :broadway_producer_module)
 
-    # GF-777: default 100ms (bylo 1000ms). Broadway flushuje na PRVNÍ splněnou
-    # podmínku (batch_size 50 NEBO batch_timeout) → nižší timeout sráží low-volume
-    # p99 z ~1034ms k ~100ms. Dřívější "nesniž timeout — SQLITE_BUSY risk" je
-    # obsolete po GF-704 (Postgres pool zvládá vyšší frekvenci malých batchů).
-    # Zdroj hodnoty: config.exs default / test.exs seam 50ms / prod env var
+    # GF-777: default 100ms (was 1000ms). Broadway flushes on the FIRST satisfied
+    # condition (batch_size 50 OR batch_timeout) → a lower timeout drops the low-volume
+    # p99 from ~1034ms to ~100ms. The earlier "don't lower the timeout — SQLITE_BUSY risk" is
+    # obsolete after GF-704 (the Postgres pool handles a higher frequency of small batches).
+    # Value source: config.exs default / test.exs seam 50ms / prod env var
     # BATCH_FLUSH_TIMEOUT_MS (runtime.exs). Fallback 100 = config.exs default.
     batch_timeout =
       Application.get_env(:span_chain, :broadway_batch_timeout_ms, 100)
@@ -63,10 +63,10 @@ defmodule SpanChain.Ingestion.Pipeline do
         concurrency: 1
       ],
       processors: [
-        # GF-779: Postgres MVCC umožňuje souběžné zápisy → procesory škálují s
-        # počtem schedulerů. Procesory NEpartitionujeme (per-message práce je
-        # pure pass-through; partition_by patří jen na batcher — CLAUDE.md).
-        # Test env pinováno na 1 přes :broadway_processor_concurrency seam.
+        # GF-779: Postgres MVCC allows concurrent writes → processors scale with
+        # the number of schedulers. We do NOT partition the processors (the per-message work is
+        # a pure pass-through; partition_by belongs only on the batcher — CLAUDE.md).
+        # Test env pinned to 1 via the :broadway_processor_concurrency seam.
         default: [
           concurrency:
             Application.get_env(
@@ -80,10 +80,10 @@ defmodule SpanChain.Ingestion.Pipeline do
         default: [
           batch_size: 50,
           batch_timeout: batch_timeout,
-          # GF-779: partition_by hashuje run_id → stejný run_id vždy na stejnou
-          # batcher partition (serializace per session), různé run_ids paralelně.
-          # MUSÍ být :erlang.phash2/1 — Broadway počítá rem(func.(msg), concurrency),
-          # bare string run_id by spadl na ArithmeticError.
+          # GF-779: partition_by hashes run_id → the same run_id always to the same
+          # batcher partition (per-session serialization), different run_ids in parallel.
+          # MUST be :erlang.phash2/1 — Broadway computes rem(func.(msg), concurrency),
+          # a bare string run_id would crash with ArithmeticError.
           concurrency: Application.get_env(:span_chain, :broadway_batcher_concurrency, 4),
           partition_by: fn msg -> :erlang.phash2(msg.data.run_id) end
         ]
@@ -93,7 +93,7 @@ defmodule SpanChain.Ingestion.Pipeline do
 
   @impl Broadway
   def handle_message(_processor_name, message, _context) do
-    # Pass-through — batching dělá batcher; processor jen partitionuje.
+    # Pass-through — the batcher does the batching; the processor only partitions.
     message
   end
 
@@ -102,24 +102,24 @@ defmodule SpanChain.Ingestion.Pipeline do
     entries = Enum.map(messages, & &1.data)
     ledger_mod = Application.get_env(:span_chain, :ledger_module, Ledger)
 
-    # GF-751/GF-746: metadata upserty PŘED ledger insert.
-    # Pořadí: ensure_run_records → ensure_eval_records (FK runs.eval_id → evals.eval_id)
+    # GF-751/GF-746: metadata upserts BEFORE the ledger insert.
+    # Order: ensure_run_records → ensure_eval_records (FK runs.eval_id → evals.eval_id)
     # → upsert_agent_configs → insert_batch → broadcast.
-    # Každá metadata funkce má vlastní defensive rescue — selhání NIKDY nesmí
-    # crashnout Pipeline ani zablokovat ledger insert (hash chain je kritická cesta).
+    # Each metadata function has its own defensive rescue — a failure must NEVER
+    # crash the Pipeline or block the ledger insert (the hash chain is the critical path).
     ensure_run_records(entries)
     ensure_eval_records(entries)
     upsert_agent_configs(entries)
 
-    # `:eval_id` je SGS-side metadata (GF-751) — NE Ledger schema field.
-    # Strip před `insert_batch`, jinak `Repo.insert_all(Ledger, ...)` raise na unknown field.
+    # `:eval_id` is SGS-side metadata (GF-751) — NOT a Ledger schema field.
+    # Strip it before `insert_batch`, otherwise `Repo.insert_all(Ledger, ...)` raises on the unknown field.
     ledger_entries = Enum.map(entries, &Map.delete(&1, :eval_id))
 
     try do
-      # GF-703: Repo.transaction jako WAL synchronizační bariéra. {:ok, _} return
-      # je garance, že commit proběhl → data jsou viditelná pro všechny WAL readery
-      # → broadcast je správný signál. Broadcast MUSÍ být po returnu z transakce,
-      # nikdy uvnitř transakčního bloku.
+      # GF-703: Repo.transaction as a WAL synchronization barrier. The {:ok, _} return
+      # guarantees the commit happened → the data is visible to all WAL readers
+      # → broadcast is the correct signal. The broadcast MUST come after the transaction returns,
+      # never inside the transaction block.
       result =
         with_retry(fn ->
           case Repo.transaction(fn -> ledger_mod.insert_batch(ledger_entries) end) do
@@ -131,8 +131,8 @@ defmodule SpanChain.Ingestion.Pipeline do
       case result do
         {:ok, _result} ->
           broadcast_flushed(entries)
-          # GF-775: drain signál pro crash recovery — ensure_session/1 na něj čeká
-          # před epoch rolloverem. Po commitu (read-after-write garantován).
+          # GF-775: drain signal for crash recovery — ensure_session/1 waits on it
+          # before the epoch rollover. After commit (read-after-write guaranteed).
           broadcast_epoch_flushed(entries)
           messages
 
@@ -145,17 +145,17 @@ defmodule SpanChain.Ingestion.Pipeline do
           Enum.map(messages, &Message.failed(&1, inspect(reason)))
       end
     rescue
-      # Broadway gotcha: raise v handle_batch crashne supervisor (max_restarts 3/5s).
-      # Vždy konvertovat na Message.failed/2.
+      # Broadway gotcha: a raise in handle_batch crashes the supervisor (max_restarts 3/5s).
+      # Always convert to Message.failed/2.
       e ->
         Logger.error("[Pipeline] handle_batch rescued #{inspect(e)}")
         Enum.map(messages, &Message.failed(&1, Exception.message(e)))
     end
   end
 
-  # PubSub notify TrailLive po úspěšném batch insertu (backlog #9+#10).
-  # Jednosměrná závislost: Pipeline zná PubSub, ne LiveView. Použít broadcast/3
-  # (nikoli !) — failure PubSub nesmí padnout Pipeline.
+  # PubSub notify TrailLive after a successful batch insert (backlog #9+#10).
+  # One-way dependency: the Pipeline knows PubSub, not the LiveView. Use broadcast/3
+  # (not !) — a PubSub failure must not bring down the Pipeline.
   defp broadcast_flushed(entries) do
     entries
     |> Enum.map(& &1.run_id)
@@ -189,9 +189,9 @@ defmodule SpanChain.Ingestion.Pipeline do
     end
   end
 
-  # GF-775: epoch-flush signál pro crash recovery drain. Jeden broadcast per
-  # unikátní {run_id, epoch_id} v dávce (per-epoch kvůli možnému mid-batch
-  # 1000-event rolloveru). Stejný crash-safe pattern jako safe_broadcast/1.
+  # GF-775: epoch-flush signal for the crash recovery drain. One broadcast per
+  # unique {run_id, epoch_id} in the batch (per-epoch because of a possible mid-batch
+  # 1000-event rollover). Same crash-safe pattern as safe_broadcast/1.
   defp broadcast_epoch_flushed(entries) do
     entries
     |> Enum.map(&{&1.run_id, &1.epoch_id})
@@ -221,8 +221,8 @@ defmodule SpanChain.Ingestion.Pipeline do
 
   @impl Broadway
   def handle_failed(messages, _context) do
-    # Broadway vyčerpalo všechny pokusy (v naší konfiguraci = 1 batch attempt).
-    # DeadLetter.store je defenzivní — failure samotného store je jen logged.
+    # Broadway exhausted all attempts (in our configuration = 1 batch attempt).
+    # DeadLetter.store is defensive — a failure of the store itself is only logged.
     dead_letter_mod = Application.get_env(:span_chain, :dead_letter_module, DeadLetter)
 
     Enum.each(messages, fn %Message{data: entry, status: status} ->
@@ -232,7 +232,7 @@ defmodule SpanChain.Ingestion.Pipeline do
           other -> inspect(other)
         end
 
-      # Stub může i sám raise — handle_failed nesmí crashnout Broadway.
+      # The stub may itself raise — handle_failed must not crash Broadway.
       try do
         _ = dead_letter_mod.store(entry.run_id, [entry], reason)
       rescue
@@ -258,20 +258,20 @@ defmodule SpanChain.Ingestion.Pipeline do
       %{run_ids: run_ids}
     )
 
-    # Broadway requirement: handle_failed VŽDY vrátí messages (i prázdné).
+    # Broadway requirement: handle_failed ALWAYS returns messages (even empty).
     messages
   end
 
   # --------------------------------------------------------------------------
-  # GF-751: ensure runs/evals záznamy — přesun z SessionGenServer.init/1 a
-  # maybe_apply_late_eval_id. SGS je nyní čistý in-memory hash chain bez
-  # DB side-efektů; metadata upserty probíhají uvnitř Broadway batche.
+  # GF-751: ensure runs/evals records — moved out of SessionGenServer.init/1 and
+  # maybe_apply_late_eval_id. The SGS is now a pure in-memory hash chain without
+  # DB side-effects; the metadata upserts happen inside the Broadway batch.
   # --------------------------------------------------------------------------
 
-  # Per-batch upsert do `runs` tabulky na PK `run_id`. GF-790: on_conflict aktualizuje
-  # POUZE `started_at` přes LEAST (nejstarší span napříč dávkami); ostatní sloupce
-  # (status/agent_name/…) zůstávají nedotčené → idempotentní vůči metadatům.
-  # Defensive: failure NIKDY nesmí crashnout Pipeline.
+  # Per-batch upsert into the `runs` table on the PK `run_id`. GF-790: on_conflict updates
+  # ONLY `started_at` via LEAST (the oldest span across batches); the other columns
+  # (status/agent_name/…) stay untouched → idempotent with respect to metadata.
+  # Defensive: a failure must NEVER crash the Pipeline.
   @doc false
   def ensure_run_records(entries) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -280,8 +280,8 @@ defmodule SpanChain.Ingestion.Pipeline do
       entries
       |> Enum.group_by(& &1.run_id)
       |> Enum.map(fn {run_id, run_entries} ->
-        # GF-790: nejstarší started_at z této dávky pro daný run (nil-safe). Dávka
-        # může obsahovat víc run_ids → min počítáme per run, ne přes celý batch.
+        # GF-790: the oldest started_at from this batch for the given run (nil-safe). A batch
+        # may contain multiple run_ids → we compute min per run, not across the whole batch.
         started_at =
           run_entries
           |> Enum.map(&Map.get(&1, :started_at))
@@ -296,12 +296,12 @@ defmodule SpanChain.Ingestion.Pipeline do
         :ok
 
       _ ->
-        # GF-790: LEAST upsert — runs.started_at konverguje k nejstaršímu spanu
-        # napříč dávkami (out-of-order ingest). Postgres LEAST ignoruje NULL
-        # (nil-safe). Mění VÝHRADNĚ started_at; status/agent_name/… zůstávají
-        # (řeší ensure_eval_records / upsert_agent_configs). Query forma on_conflict
-        # (ne keyword `set:`) — `fragment` se rozbaluje jen v Ecto query kontextu;
-        # `?` váže existující řádek (`r.started_at`), `EXCLUDED` je navrhovaný řádek.
+        # GF-790: LEAST upsert — runs.started_at converges to the oldest span
+        # across batches (out-of-order ingest). Postgres LEAST ignores NULL
+        # (nil-safe). Changes started_at EXCLUSIVELY; status/agent_name/… stay
+        # (handled by ensure_eval_records / upsert_agent_configs). Query form of on_conflict
+        # (not the keyword `set:`) — `fragment` only expands in an Ecto query context;
+        # `?` binds the existing row (`r.started_at`), `EXCLUDED` is the proposed row.
         Repo.insert_all("runs", rows,
           on_conflict:
             from(r in "runs",
@@ -324,11 +324,11 @@ defmodule SpanChain.Ingestion.Pipeline do
       :ok
   end
 
-  # GF-746: per-batch upsert do `evals` + `runs.eval_id` update.
-  # Pořadí uvnitř: Eval insert PRVNÍ (FK target pro runs.eval_id), pak Run update.
-  # COALESCE first-wins na runs.eval_id pro GF-727 idempotenci — druhý batch
-  # s jiným eval_id pro stejný run_id nepřepíše první (stejný pattern jako
-  # `maybe_update_run_agent_config`). Defensive rescue jako `ensure_run_records`.
+  # GF-746: per-batch upsert into `evals` + `runs.eval_id` update.
+  # Internal order: Eval insert FIRST (the FK target for runs.eval_id), then the Run update.
+  # COALESCE first-wins on runs.eval_id for GF-727 idempotence — a second batch
+  # with a different eval_id for the same run_id does not overwrite the first (same pattern as
+  # `maybe_update_run_agent_config`). Defensive rescue like `ensure_run_records`.
   @doc false
   def ensure_eval_records(entries) do
     pairs =
@@ -379,10 +379,10 @@ defmodule SpanChain.Ingestion.Pipeline do
   # GF-748: gf.agent.* projection upsert (first-wins via COALESCE)
   # --------------------------------------------------------------------------
 
-  # Per-run extraction of gf.agent.* attrs + COALESCE upsert do `runs`.
-  # Defensive: chyba NIKDY nesmí crashnout Pipeline (gf.agent.* je metadata,
-  # ne kritická cesta). Volá se POST broadcast_flushed (transakce commitnuta,
-  # connection released — bezpečné z Broadway processor PID).
+  # Per-run extraction of gf.agent.* attrs + COALESCE upsert into `runs`.
+  # Defensive: an error must NEVER crash the Pipeline (gf.agent.* is metadata,
+  # not the critical path). Called AFTER broadcast_flushed (transaction committed,
+  # connection released — safe from the Broadway processor PID).
   @doc false
   def upsert_agent_configs(entries) do
     entries
@@ -425,10 +425,10 @@ defmodule SpanChain.Ingestion.Pipeline do
 
   @doc false
   def maybe_update_run_agent_config(run_id, config) do
-    # COALESCE(existing, new) = first-wins. Pokud Run.model už non-nil (z GF-669
-    # SGS ensure_run_record path), zachová se. Jinak vyplní novou hodnotou.
-    # Pin (`^`) v `set:` musí být uvnitř Ecto query DSL — proto `from(..., update: ...)`
-    # místo `set:` jako Repo.update_all/3 opts.
+    # COALESCE(existing, new) = first-wins. If Run.model is already non-nil (from the GF-669
+    # SGS ensure_run_record path), it is kept. Otherwise it is filled with the new value.
+    # The pin (`^`) in `set:` must be inside the Ecto query DSL — hence `from(..., update: ...)`
+    # instead of `set:` as Repo.update_all/3 opts.
     from(r in Run,
       where: r.run_id == ^run_id,
       update: [
@@ -447,17 +447,17 @@ defmodule SpanChain.Ingestion.Pipeline do
   end
 
   # --------------------------------------------------------------------------
-  # Private — retry helper (per CLAUDE.md Do NOT: nesdílet napříč moduly)
+  # Private — retry helper (per CLAUDE.md Do NOT: don't share across modules)
   # --------------------------------------------------------------------------
 
-  # 3 pokusy, exp backoff 500/1000/2000 ms (~3.5s worst case). Stejná sémantika
-  # jako bývalá SessionGenServer.with_retry před GF-667 refactorem.
-  # `delay_ms` default čte runtime config — test env override na 1ms (config/test.exs).
+  # 3 attempts, exp backoff 500/1000/2000 ms (~3.5s worst case). Same semantics
+  # as the former SessionGenServer.with_retry before the GF-667 refactor.
+  # The `delay_ms` default reads runtime config — test env overrides to 1ms (config/test.exs).
   #
-  # GF-704 decision: Scénář B — blanket retry, žádné SQLite-specifické patterny.
-  # `try_fun/1` chytá libovolnou exception/throw, takže transientní Postgres chyby
-  # (DBConnection.ConnectionError, :queue_timeout) jsou pokryté beze změny. Catch-all
-  # ZACHOVÁN záměrně — zúžení na konkrétní rescue clauses by snížilo coverage.
+  # GF-704 decision: Scenario B — blanket retry, no SQLite-specific patterns.
+  # `try_fun/1` catches any exception/throw, so transient Postgres errors
+  # (DBConnection.ConnectionError, :queue_timeout) are covered unchanged. The catch-all is
+  # KEPT deliberately — narrowing it to specific rescue clauses would reduce coverage.
   defp with_retry(
          fun,
          attempts \\ @retry_attempts,

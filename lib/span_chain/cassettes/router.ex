@@ -1,14 +1,14 @@
 defmodule SpanChain.Cassettes.Router do
   @moduledoc """
-  HTTP API pro Cassettes doménu (GF-712). Sub-router forwardovaný z hlavního
-  `Ingestion.Router` na `/cassettes/*`. AuthPlug už proběhl v hlavním
-  routeru.
+  HTTP API for the Cassettes domain (GF-712). A sub-router forwarded from the main
+  `Ingestion.Router` to `/cassettes/*`. AuthPlug has already run in the main
+  router.
 
   Routes:
-    * `POST /record` — záznam cassety z existujícího runu (201 / 400 / 404)
+    * `POST /record` — record a cassette from an existing run (201 / 400 / 404)
     * `GET /:cassette_id` — detail + spans (200 / 404)
-    * `GET /` — list metadat ordered by `recorded_at DESC` (200)
-    * `POST /:cassette_id/replay` — přehraj cassetu pod novým run_id
+    * `GET /` — list of metadata ordered by `recorded_at DESC` (200)
+    * `POST /:cassette_id/replay` — replay a cassette under a new run_id
       (200 / 404 / 408)
   """
 

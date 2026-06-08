@@ -1,6 +1,6 @@
-# GF-849: stub session registrovaný pod run_id Registry klíčem. ensure_session ho najde
-# přes Registry.lookup (reuse path, nespawnuje reálný SGS), ingest_spans na něj zavolá a
-# dostane {:error, …} — deterministická injektáž chyby bez sahání na SessionGenServer.
+# GF-849: a stub session registered under the run_id Registry key. ensure_session finds it
+# via Registry.lookup (reuse path, does not spawn a real SGS), ingest_spans calls it and
+# gets {:error, …} — deterministic error injection without touching SessionGenServer.
 defmodule SpanChain.Ingestion.ErrorStubSession do
   @moduledoc false
   use GenServer
@@ -110,9 +110,9 @@ defmodule SpanChain.Ingestion.RouterTest do
     assert conn.status == 202
     assert {:ok, %{"accepted" => 1, "run_id" => "router-test-1"}} = Jason.decode(conn.resp_body)
 
-    # GF-703: post-commit PubSub broadcast firi AŽ PO Repo.transaction return
-    # → Broadway uvolnil connection. Telemetry [:gf, :ledger, :batch_insert, :stop]
-    # firi UVNITR transakce → race s commit → Exqlite ConnectionError "owner exited".
+    # GF-703: the post-commit PubSub broadcast fires only AFTER the Repo.transaction returns
+    # → Broadway has released the connection. Telemetry [:gf, :ledger, :batch_insert, :stop]
+    # fires INSIDE the transaction → races with the commit → Exqlite ConnectionError "owner exited".
     assert_receive {:spans_flushed, "router-test-1"}, 5_000
   end
 
@@ -158,13 +158,13 @@ defmodule SpanChain.Ingestion.RouterTest do
     _conn = post_json(body)
 
     assert_receive {:req_stop, _m, %{run_id: "telem-test", status: 202}}, 1_000
-    # GF-703: post-commit broadcast (viz "POST /ingest" test komentar).
+    # GF-703: post-commit broadcast (see the "POST /ingest" test comment).
     assert_receive {:spans_flushed, "telem-test"}, 5_000
   end
 
   describe "input validation (GF-767)" do
-    # ValidationPlug odmítne malformed run_id na /ingest boundary (před validate/1).
-    # Minimální spans → jediný failující faktor je run_id.
+    # ValidationPlug rejects a malformed run_id at the /ingest boundary (before validate/1).
+    # Minimal spans → the only failing factor is run_id.
     @bad_id_spans [%{"span_id" => "s1", "name" => "llm_call"}]
 
     test "path traversal run_id → 400 invalid_id_format" do
@@ -181,17 +181,17 @@ defmodule SpanChain.Ingestion.RouterTest do
       assert {:ok, %{"error" => "invalid_id_format"}} = Jason.decode(conn.resp_body)
     end
 
-    test "run_id delší než 128 znaků → 400" do
+    test "run_id longer than 128 characters → 400" do
       conn = post_json(%{"run_id" => String.duplicate("a", 129), "spans" => @bad_id_spans})
       assert conn.status == 400
     end
 
-    test "prázdný run_id → 400" do
+    test "empty run_id → 400" do
       conn = post_json(%{"run_id" => "", "spans" => @bad_id_spans})
       assert conn.status == 400
     end
 
-    test "validní slug run_id → 202" do
+    test "valid slug run_id → 202" do
       run_id = "my-agent_run-001"
       Phoenix.PubSub.subscribe(SpanChain.PubSub, "run:#{run_id}")
 
@@ -203,7 +203,7 @@ defmodule SpanChain.Ingestion.RouterTest do
       assert_receive {:spans_flushed, ^run_id}, 5_000
     end
 
-    test "UUID formát run_id → 202" do
+    test "UUID format run_id → 202" do
       run_id = "550e8400-e29b-41d4-a716-446655440000"
       Phoenix.PubSub.subscribe(SpanChain.PubSub, "run:#{run_id}")
 
@@ -220,7 +220,7 @@ defmodule SpanChain.Ingestion.RouterTest do
     setup do
       Application.put_env(:span_chain, :rate_limit_enabled, true)
       Application.put_env(:span_chain, :rate_limit_count, 2)
-      # Sdílený token bucket (klíč = Bearer token, period 60s) — vyčisti mezi testy.
+      # Shared token bucket (key = Bearer token, period 60s) — clean between tests.
       PlugAttack.Storage.Ets.clean(SpanChain.Ingestion.RateLimiter)
 
       on_exit(fn ->
@@ -231,20 +231,20 @@ defmodule SpanChain.Ingestion.RouterTest do
       :ok
     end
 
-    test "throttle per API key — 3. request nad limit → 429 + Retry-After" do
+    test "throttle per API key — 3rd request over the limit → 429 + Retry-After" do
       run_id = "rate-limit-test"
       Phoenix.PubSub.subscribe(SpanChain.PubSub, "run:#{run_id}")
       body = %{"run_id" => run_id, "spans" => [%{"span_id" => "s1", "name" => "llm_call"}]}
 
-      # Request 1 a 2 pod limitem (limit: 2) → 202; čekej na Broadway flush
-      # (CLAUDE.md: post-commit PubSub broadcast, jinak Exqlite "owner exited").
+      # Requests 1 and 2 under the limit (limit: 2) → 202; wait for the Broadway flush
+      # (CLAUDE.md: post-commit PubSub broadcast, otherwise Exqlite "owner exited").
       assert post_json(body).status == 202
       assert_receive {:spans_flushed, ^run_id}, 5_000
 
       assert post_json(body).status == 202
       assert_receive {:spans_flushed, ^run_id}, 5_000
 
-      # Request 3 nad limit → 429 + halt() PŘED Plug.Parsers/match (data do SGS nedorazí).
+      # Request 3 over the limit → 429 + halt() BEFORE Plug.Parsers/match (data never reaches the SGS).
       conn = post_json(body)
       assert conn.status == 429
       assert {:ok, %{"error" => "rate_limit_exceeded"}} = Jason.decode(conn.resp_body)
@@ -252,10 +252,10 @@ defmodule SpanChain.Ingestion.RouterTest do
       assert String.to_integer(retry_after) >= 1
     end
 
-    # GF-785: /health musí být exempt i s Bearer tokenem nad limit. Token-bearing
-    # (ne tokenless) — tokenless /health by prošel i bez fixu přes `_ -> allow(true)`.
-    test "GET /health je exempt z throttle — i s tokenem nad limit → vždy 200 (GF-785)" do
-      # count: 2 (setup). Bez exempt pravidla by 3. token-bearing /health dostal 429.
+    # GF-785: /health must be exempt even with a Bearer token over the limit. Token-bearing
+    # (not tokenless) — a tokenless /health would pass even without the fix via `_ -> allow(true)`.
+    test "GET /health is exempt from throttle — even with a token over the limit → always 200 (GF-785)" do
+      # count: 2 (setup). Without the exempt rule the 3rd token-bearing /health would get a 429.
       for _ <- 1..(2 + 2) do
         conn =
           conn(:get, "/health")
@@ -266,19 +266,19 @@ defmodule SpanChain.Ingestion.RouterTest do
       end
     end
 
-    test "/ingest stále throttluje + /health exempt i po vyčerpání bucketu (GF-785 regrese)" do
+    test "/ingest still throttles + /health stays exempt even after the bucket is exhausted (GF-785 regression)" do
       run_id = "gf785-regress"
       Phoenix.PubSub.subscribe(SpanChain.PubSub, "run:#{run_id}")
       body = %{"run_id" => run_id, "spans" => [%{"span_id" => "s1", "name" => "llm_call"}]}
 
-      # 2 pod limitem → 202 (čekej na Broadway flush), 3. nad limit → 429 (regrese).
+      # 2 under the limit → 202 (wait for the Broadway flush), 3rd over the limit → 429 (regression).
       assert post_json(body).status == 202
       assert_receive {:spans_flushed, ^run_id}, 5_000
       assert post_json(body).status == 202
       assert_receive {:spans_flushed, ^run_id}, 5_000
       assert post_json(body).status == 429
 
-      # Stejný token má vyčerpaný bucket, ale /health je exempt → 200 (nezávisle na bucketu).
+      # The same token has an exhausted bucket, but /health is exempt → 200 (independent of the bucket).
       health =
         conn(:get, "/health")
         |> put_req_header("authorization", "Bearer #{@valid_token}")
@@ -303,8 +303,8 @@ defmodule SpanChain.Ingestion.RouterTest do
       assert_receive {:spans_flushed, ^run_id}, 5_000
     end
 
-    # GF-774: run_id validace na /v1/traces (obchází path-scoped ValidationPlug).
-    # run_id jde přes resource.attributes["service.instance.id"] (viz otlp_body/2).
+    # GF-774: run_id validation on /v1/traces (bypasses the path-scoped ValidationPlug).
+    # run_id comes through resource.attributes["service.instance.id"] (see otlp_body/2).
     test "POST /v1/traces rejects path traversal run_id" do
       conn = post_otlp(otlp_body("../../etc/passwd"))
       assert conn.status == 400
@@ -396,7 +396,7 @@ defmodule SpanChain.Ingestion.RouterTest do
   end
 
   describe "POST /v1/traces error resilience (GF-849)" do
-    test "ingest {:error} → 200 (ne 500) + rejectedSpans + log, ne MatchError" do
+    test "ingest {:error} → 200 (not 500) + rejectedSpans + log, not a MatchError" do
       run_id = "otlp-err-1"
       start_supervised!(%{id: :otlp_err_stub, start: {ErrorStubSession, :start_link, [run_id]}})
 
@@ -404,7 +404,7 @@ defmodule SpanChain.Ingestion.RouterTest do
         capture_log(fn ->
           conn = post_otlp(otlp_body(run_id))
 
-          # Jádro fixu: bare match by hodil MatchError → 500. with/else → 200.
+          # The core of the fix: a bare match would throw a MatchError → 500. with/else → 200.
           assert conn.status == 200
 
           assert {:ok, %{"partialSuccess" => %{"rejectedSpans" => 1}}} =
@@ -415,7 +415,7 @@ defmodule SpanChain.Ingestion.RouterTest do
       assert log =~ "stub_ingest_error"
     end
 
-    test "chybná group nezahodí zbývající — dobrá projde, chybná je rejected" do
+    test "a bad group does not drop the rest — the good one passes, the bad one is rejected" do
       run_ok = "otlp-mix-ok"
       run_bad = "otlp-mix-bad"
       Phoenix.PubSub.subscribe(SpanChain.PubSub, "run:#{run_ok}")
@@ -447,7 +447,7 @@ defmodule SpanChain.Ingestion.RouterTest do
       assert conn.status == 200
       assert {:ok, %{"partialSuccess" => %{"rejectedSpans" => 1}}} = Jason.decode(conn.resp_body)
 
-      # Dobrá group se ingestla a flushla navzdory chybné (žádné tiché zahození).
+      # The good group was ingested and flushed despite the bad one (no silent dropping).
       assert_receive {:spans_flushed, ^run_ok}, 5_000
     end
   end
@@ -458,23 +458,23 @@ defmodule SpanChain.Ingestion.RouterTest do
       "spans" => [%{"span_id" => "s1", "name" => "x"}]
     }
 
-    test "POST /ingest bez authorization hlavičky → 401" do
+    test "POST /ingest without an authorization header → 401" do
       conn = post_json(@valid_body, token: :none)
       assert conn.status == 401
       assert conn.resp_body == "Unauthorized"
     end
 
-    test "POST /ingest s nesprávným tokenem → 401" do
+    test "POST /ingest with an incorrect token → 401" do
       conn = post_json(@valid_body, token: "wrong-token")
       assert conn.status == 401
     end
 
-    test "POST /ingest s authorization bez Bearer prefixu → 401" do
+    test "POST /ingest with authorization but no Bearer prefix → 401" do
       conn = post_json(@valid_body, token: {:raw, "test-secret"})
       assert conn.status == 401
     end
 
-    test "GET /health je volný — bez authorization → 200" do
+    test "GET /health is open — without authorization → 200" do
       conn = conn(:get, "/health") |> Router.call(@opts)
       assert conn.status == 200
     end
@@ -562,11 +562,11 @@ defmodule SpanChain.Ingestion.RouterTest do
   # Helper — generic router call used by /cassettes tests.
   # ---------------------------------------------------------------------------
 
-  # GF-712: čekej na post-commit PubSub broadcast (GF-703), NE na telemetry
-  # `[:gf, :ledger, :batch_insert, :stop]` — ten firi UVNITR Repo.transakce
-  # (pred commitem) → test exit pak race-uje s Broadway commitem → Exqlite
-  # ConnectionError "owner exited" v logu. `{:spans_flushed, run_id}` firi
-  # AŽ PO `Repo.transaction` returnu (tj. po commitu i release connection).
+  # GF-712: wait for the post-commit PubSub broadcast (GF-703), NOT for the telemetry
+  # `[:gf, :ledger, :batch_insert, :stop]` — that fires INSIDE the Repo.transaction
+  # (before commit) → the test exit then races with the Broadway commit → Exqlite
+  # ConnectionError "owner exited" in the log. `{:spans_flushed, run_id}` fires
+  # only AFTER the `Repo.transaction` returns (i.e. after commit and connection release).
   defp seed_single_span_run(run_id) do
     Phoenix.PubSub.subscribe(SpanChain.PubSub, "run:#{run_id}")
     {:ok, _pid} = SessionSupervisor.ensure_session(run_id)

@@ -19,9 +19,9 @@ defmodule SpanChain.LedgerTest do
 
   defp fresh_run_id, do: "gf652-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower)
 
-  # GF-667: ingest je nyní async přes Broadway. Helper attachne telemetry před
-  # ingest_spans, akumuluje `count` z [:gf, :ledger, :batch_insert, :stop] eventů,
-  # vrací :ok jakmile dosáhne `expected_total` (nebo {:error, :timeout}).
+  # GF-667: ingest is now async via Broadway. The helper attaches telemetry before
+  # ingest_spans, accumulates `count` from [:gf, :ledger, :batch_insert, :stop] events,
+  # and returns :ok once it reaches `expected_total` (or {:error, :timeout}).
   defp attach_total_wait(test_pid) do
     ref = make_ref()
     handler_id = "gf-total-#{inspect(ref)}"
@@ -53,8 +53,8 @@ defmodule SpanChain.LedgerTest do
     end
   end
 
-  describe "compute_hash/7 — parent_span_id + run/epoch v hashi" do
-    test "stejný event s různým parent_span_id → různý hash (tamper-evidence)" do
+  describe "compute_hash/7 — parent_span_id + run/epoch in the hash" do
+    test "same event with a different parent_span_id → different hash (tamper-evidence)" do
       seq = 1
       prev = "abc"
       event = "llm_call"
@@ -71,7 +71,7 @@ defmodule SpanChain.LedgerTest do
       refute h_nil == h_s2
     end
 
-    test "run_id a epoch_id jsou v hashi (GF-787 — entry vázána ke svému runu/epoše)" do
+    test "run_id and epoch_id are in the hash (GF-787 — entry bound to its run/epoch)" do
       base = Ledger.compute_hash(0, nil, "x", %{}, nil, "run-a", 0)
       diff_run = Ledger.compute_hash(0, nil, "x", %{}, nil, "run-b", 0)
       diff_epoch = Ledger.compute_hash(0, nil, "x", %{}, nil, "run-a", 1)
@@ -88,9 +88,9 @@ defmodule SpanChain.LedgerTest do
   end
 
   describe "compute_hash/7 — canonical JSON (GF-654)" do
-    test "hash je deterministický nezávisle na pořadí klíčů v top-level + vnořených mapách + mapách uvnitř pole" do
-      # llm_call payload (viz docs/payload-schemas.md): input je array of maps,
-      # decision je nested map. Insertion order liší se na všech třech úrovních.
+    test "hash is deterministic regardless of key order in top-level + nested maps + maps inside a list" do
+      # llm_call payload (see docs/payload-schemas.md): input is an array of maps,
+      # decision is a nested map. Insertion order differs at all three levels.
       payload_a = %{
         "model" => "claude-sonnet-4-6",
         "input" => [
@@ -117,21 +117,21 @@ defmodule SpanChain.LedgerTest do
   end
 
   describe "build_entry trace_id projection (GF-653)" do
-    test "snake_case extraction — /ingest JSON cesta" do
+    test "snake_case extraction — /ingest JSON path" do
       entry =
         Ledger.build_entry("run-1", 0, 0, nil, "llm_call", %{"trace_id" => "abc123"})
 
       assert entry.trace_id == "abc123"
     end
 
-    test "camelCase fallback — defenzivní pro nepřekládané zdroje" do
+    test "camelCase fallback — defensive for untranslated sources" do
       entry =
         Ledger.build_entry("run-1", 0, 0, nil, "llm_call", %{"traceId" => "def456"})
 
       assert entry.trace_id == "def456"
     end
 
-    test "nil pokud chybí v payloadu" do
+    test "nil if missing from the payload" do
       entry = Ledger.build_entry("run-1", 0, 0, nil, "llm_call", %{"name" => "x"})
       assert entry.trace_id == nil
     end
@@ -155,7 +155,7 @@ defmodule SpanChain.LedgerTest do
       {:ok, ref: ref}
     end
 
-    test "span s parent_span_id se uloží a načte zpět přes Repo.all/1", %{ref: ref} do
+    test "span with parent_span_id is stored and read back via Repo.all/1", %{ref: ref} do
       run_id = fresh_run_id()
       {:ok, pid} = SessionSupervisor.ensure_session(run_id)
       Ecto.Adapters.SQL.Sandbox.allow(SpanChain.Repo, self(), pid)
@@ -197,11 +197,11 @@ defmodule SpanChain.LedgerTest do
       {:ok, ref: ref}
     end
 
-    test "vrátí count=0 pro neznámý run_id" do
+    test "returns count=0 for an unknown run_id" do
       assert {:ok, 0} = Ledger.verify_ledger("does-not-exist")
     end
 
-    test "vrátí count pro čerstvě napsaný chain", %{ref: ref} do
+    test "returns count for a freshly written chain", %{ref: ref} do
       run_id = fresh_run_id()
       {:ok, pid} = SessionSupervisor.ensure_session(run_id)
       Ecto.Adapters.SQL.Sandbox.allow(SpanChain.Repo, self(), pid)
@@ -213,7 +213,9 @@ defmodule SpanChain.LedgerTest do
       assert {:ok, 50} = Ledger.verify_ledger(run_id)
     end
 
-    test "odhalí přímou změnu parent_span_id v DB → {:error, :chain_broken}", %{ref: ref} do
+    test "detects a direct change of parent_span_id in the DB → {:error, :chain_broken}", %{
+      ref: ref
+    } do
       run_id = fresh_run_id()
       {:ok, pid} = SessionSupervisor.ensure_session(run_id)
       Ecto.Adapters.SQL.Sandbox.allow(SpanChain.Repo, self(), pid)
@@ -229,8 +231,8 @@ defmodule SpanChain.LedgerTest do
 
       assert {:ok, 50} = Ledger.verify_ledger(run_id)
 
-      # Simuluj tamper: přepiš parent_span_id u jednoho řádku přímo v DB,
-      # bez přepočítání hashe → chain musí prasknout.
+      # Simulate a tamper: overwrite parent_span_id on one row directly in the DB,
+      # without recomputing the hash → the chain must break.
       {1, _} =
         from(l in Ledger, where: l.run_id == ^run_id and l.seq == 5)
         |> Repo.update_all(set: [parent_span_id: "tampered-value"])
@@ -240,7 +242,7 @@ defmodule SpanChain.LedgerTest do
   end
 
   describe "verify_ledger/1 cross-epoch continuity (GF-666)" do
-    test "1001 spans přes SGS: epoch 1 first entry má prev_hash != nil, verify {:ok, 1001}" do
+    test "1001 spans via SGS: epoch 1 first entry has prev_hash != nil, verify {:ok, 1001}" do
       run_id = fresh_run_id()
       {:ok, pid} = SessionSupervisor.ensure_session(run_id)
       Ecto.Adapters.SQL.Sandbox.allow(SpanChain.Repo, self(), pid)
@@ -269,10 +271,10 @@ defmodule SpanChain.LedgerTest do
       assert {:ok, 1001} = Ledger.verify_ledger(run_id)
     end
 
-    test "Island Attack: smazání prostřední epochy rozbije chain → {:error, :chain_broken}" do
+    test "Island Attack: deleting a middle epoch breaks the chain → {:error, :chain_broken}" do
       run_id = fresh_run_id()
 
-      # 3 epochy x 3 záznamy, chain prochází plynule přes epoch hranice
+      # 3 epochs x 3 records, the chain runs seamlessly across the epoch boundaries
       {entries, _last} =
         Enum.reduce(0..8, {[], nil}, fn i, {acc, prev_hash} ->
           epoch_id = div(i, 3)
@@ -286,15 +288,15 @@ defmodule SpanChain.LedgerTest do
 
       {9, _} = Ledger.insert_batch(entries)
 
-      # Sanity: nedotčený chain validuje
+      # Sanity: the untouched chain validates
       assert {:ok, 9} = Ledger.verify_ledger(run_id)
 
-      # Útok: smaž celou prostřední epochu (vnitřně konzistentní, ale chybí v chainu)
+      # Attack: delete the whole middle epoch (internally consistent, but missing from the chain)
       {3, _} =
         from(l in Ledger, where: l.run_id == ^run_id and l.epoch_id == 1)
         |> Repo.delete_all()
 
-      # epoch 0 last_hash != epoch 2 first prev_hash → detekováno
+      # epoch 0 last_hash != epoch 2 first prev_hash → detected
       assert {:error, :chain_broken} = Ledger.verify_ledger(run_id)
     end
   end

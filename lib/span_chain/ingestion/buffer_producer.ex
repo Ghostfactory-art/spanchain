@@ -1,30 +1,30 @@
 defmodule SpanChain.Ingestion.BufferProducer do
   @moduledoc """
-  In-memory GenStage `:producer`. Přijímá ohashované Ledger entries od
-  SessionGenServer (`enqueue/1` cast, fire-and-forget) a vydává je Broadway
-  pipeline podle demand. Drží `:queue` + pending demand counter.
+  In-memory GenStage `:producer`. Receives hashed Ledger entries from the
+  SessionGenServer (`enqueue/1` cast, fire-and-forget) and emits them to the Broadway
+  pipeline based on demand. Holds a `:queue` + a pending demand counter.
 
-  ## Discovery přes Registry
+  ## Discovery via Registry
 
-  Broadway si v supervision tree spawne producer process pod svým interním
-  name (např. `Pipeline.Broadway.Producer_0`) — ne pod `__MODULE__`. Aby SGS
-  věděla, kam castnout, BufferProducer.init/1 si registruje pid v
-  `SpanChain.Ingestion.BufferRegistry` pod klíčem `:singleton`.
-  `enqueue/1` udělá `Registry.lookup` + `GenStage.cast`.
+  In the supervision tree Broadway spawns the producer process under its internal
+  name (e.g. `Pipeline.Broadway.Producer_0`) — not under `__MODULE__`. So that the SGS
+  knows where to cast, BufferProducer.init/1 registers its pid in
+  `SpanChain.Ingestion.BufferRegistry` under the key `:singleton`.
+  `enqueue/1` does a `Registry.lookup` + `GenStage.cast`.
 
-  Pro testy je `enqueue(pid, entries)` arity-2 — obchází Registry,
-  cast jde přímo na zadaný pid (isolated instance bez Registry registration).
+  For tests, `enqueue(pid, entries)` is arity-2 — it bypasses the Registry,
+  casting directly to the given pid (an isolated instance without Registry registration).
 
   ## Ordering guarantee
 
-  Erlang FIFO mezi SGS a producent procesem + `:queue.in/out` FIFO +
-  Broadway `partition_by: run_id` v processoru = entries pro daný `run_id`
-  přijdou do DB v insertion order.
+  Erlang FIFO between the SGS and the producer process + `:queue.in/out` FIFO +
+  Broadway `partition_by: run_id` in the processor = entries for a given `run_id`
+  arrive in the DB in insertion order.
 
-  ## Buffer není persistovaný
+  ## The buffer is not persisted
 
-  Restart procesu = ztráta in-flight entries. Akceptovatelné pro L2;
-  L3 přejde na persistentní queue (GF-648 NATS JetStream).
+  A process restart = loss of in-flight entries. Acceptable for L2;
+  L3 will move to a persistent queue (GF-648 NATS JetStream).
   """
 
   use GenStage
@@ -36,9 +36,9 @@ defmodule SpanChain.Ingestion.BufferProducer do
   @type state :: %{queue: :queue.queue(), demand: non_neg_integer()}
 
   @doc """
-  Standalone start — pro testy které chtějí izolovanou BufferProducer instance
-  (bez Registry registration; obchází singleton pattern). V production cestě
-  BufferProducer startuje Broadway uvnitř své supervision tree přes `init/1`.
+  Standalone start — for tests that want an isolated BufferProducer instance
+  (without Registry registration; bypasses the singleton pattern). On the production path
+  BufferProducer is started by Broadway inside its supervision tree via `init/1`.
   """
   def start_link(opts) do
     name = Keyword.get(opts, :name, __MODULE__)
@@ -46,9 +46,9 @@ defmodule SpanChain.Ingestion.BufferProducer do
   end
 
   @doc """
-  Cast batch entries do singleton producent fronty (přes Registry lookup).
-  Fire-and-forget — neblokuje volajícího. Volaná z SessionGenServer.handle_call
-  po build_entries.
+  Cast batch entries into the singleton producer queue (via Registry lookup).
+  Fire-and-forget — does not block the caller. Called from SessionGenServer.handle_call
+  after build_entries.
   """
   @spec enqueue([entry()]) :: :ok | {:error, :no_producer}
   def enqueue(entries) when is_list(entries) do
@@ -58,22 +58,22 @@ defmodule SpanChain.Ingestion.BufferProducer do
     end
   end
 
-  @doc "Cast přímo na konkrétní pid — pro testy s isolated BufferProducer instance."
+  @doc "Cast directly to a specific pid — for tests with an isolated BufferProducer instance."
   @spec enqueue(GenServer.server(), [entry()]) :: :ok
   def enqueue(pid, entries) when is_list(entries) do
     GenStage.cast(pid, {:enqueue, entries})
   end
 
-  # Broadway volá init/1 s keyword listem opts (obsahuje broadway: [index: 0, ...] +
-  # ty z `producer: [module: {BufferProducer, []}]`). Pro production cestu
-  # registrujeme self v singleton Registry pro SGS discovery.
+  # Broadway calls init/1 with a keyword list of opts (containing broadway: [index: 0, ...] +
+  # those from `producer: [module: {BufferProducer, []}]`). On the production path
+  # we register self in the singleton Registry for SGS discovery.
   @impl true
   def init(opts) when is_list(opts) do
     {:ok, _} = Registry.register(@registry, @registry_key, nil)
     {:producer, %{queue: :queue.new(), demand: 0}}
   end
 
-  # Standalone start (testy) — žádná Registry registration, jen producer state.
+  # Standalone start (tests) — no Registry registration, just producer state.
   @impl true
   def init({:standalone, _name}) do
     {:producer, %{queue: :queue.new(), demand: 0}}
@@ -111,8 +111,8 @@ defmodule SpanChain.Ingestion.BufferProducer do
   defp to_broadway_message(entry) do
     %Broadway.Message{
       data: entry,
-      # NoopAcknowledger.ack/3 pattern-matchuje výhradně nil ack_ref —
-      # `Broadway.NoopAcknowledger.init/0` vrátí kanonický `{Mod, nil, nil}`.
+      # NoopAcknowledger.ack/3 pattern-matches exclusively on a nil ack_ref —
+      # `Broadway.NoopAcknowledger.init/0` returns the canonical `{Mod, nil, nil}`.
       acknowledger: Broadway.NoopAcknowledger.init()
     }
   end

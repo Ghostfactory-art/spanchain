@@ -1,29 +1,29 @@
 defmodule SpanChain.Evals.Comparator do
   @moduledoc """
-  Strukturální diff dvou runů (GF-706). Pure logika — žádný GenServer, žádný stav.
-  Repo.all jako jediný side effect (deterministic pro daný DB snapshot).
+  Structural diff of two runs (GF-706). Pure logic — no GenServer, no state.
+  Repo.all as the only side effect (deterministic for a given DB snapshot).
 
-  ## Diff sémantika
+  ## Diff semantics
 
-  Stromy spans sestaveny z `parent_span_id` hierarchie (`build_tree/1` —
-  algoritmus zkopírován z `TrailLive.build_tree`). Children páruje podle
-  `name` + sibling pozice:
+  Span trees are built from the `parent_span_id` hierarchy (`build_tree/1` —
+  algorithm copied from `TrailLive.build_tree`). Children are paired by
+  `name` + sibling position:
 
-  * uzly v B které nemají match v A → `"span_added"`
-  * uzly v A které nemají match v B → `"span_removed"`
-  * spárované uzly s >20% rozdílem v `duration_ms` → `"duration_diff"`
-    s konkrétními `run_a_ms` / `run_b_ms` hodnotami
-  * agent config field (`model` / `system_prompt_hash` / `temperature` /
-    `version`) liší mezi runs → `"config_diff"` s `field` / `val_a` / `val_b`
-    (GF-748, projection z `gf.agent.*` span attrs). Config diffs jsou
-    prepended PŘED span tree diffs jako root-cause context.
+  * nodes in B with no match in A → `"span_added"`
+  * nodes in A with no match in B → `"span_removed"`
+  * paired nodes with a >20% difference in `duration_ms` → `"duration_diff"`
+    with concrete `run_a_ms` / `run_b_ms` values
+  * an agent config field (`model` / `system_prompt_hash` / `temperature` /
+    `version`) differing between runs → `"config_diff"` with `field` / `val_a` / `val_b`
+    (GF-748, projection from `gf.agent.*` span attrs). Config diffs are
+    prepended BEFORE the span tree diffs as root-cause context.
 
-  První emitovaný diff v každé root branch dostane `"deviation_point" => true`
-  (signál "tady se chování odklonilo poprvé"). Config diffs marker NEDOSTÁVAJÍ
-  — jsou pre-flight kontext, ne deviation v span tree.
+  The first emitted diff in each root branch gets `"deviation_point" => true`
+  (a signal "this is where behavior first diverged"). Config diffs do NOT get the marker
+  — they are pre-flight context, not a deviation in the span tree.
 
-  Pokud oba runs mají non-nil `eval_id` a liší se → `{:error, :different_eval}`
-  (nesmysl porovnávat runs z různých evals).
+  If both runs have a non-nil `eval_id` and they differ → `{:error, :different_eval}`
+  (it makes no sense to compare runs from different evals).
   """
 
   import Ecto.Query
@@ -44,9 +44,9 @@ defmodule SpanChain.Evals.Comparator do
         "run_b" => summarize(spans_b)
       }
 
-      # GF-748: config diffs PRVNÍ (root-cause kontext před span tree divergencí).
-      # mark_deviation_points operuje uvnitř diff_trees per top-level větev,
-      # takže config_diffs marker nedostanou; span tree zachová existing semantiku.
+      # GF-748: config diffs FIRST (root-cause context before the span tree divergence).
+      # mark_deviation_points operates inside diff_trees per top-level branch,
+      # so config_diffs don't get the marker; the span tree keeps the existing semantics.
       config_diffs = diff_agent_config(run_a, run_b)
       tree_diffs = diff_trees(tree_a, tree_b)
       differences = config_diffs ++ tree_diffs
@@ -101,7 +101,7 @@ defmodule SpanChain.Evals.Comparator do
     end
   end
 
-  # Algoritmus zkopírovaný z trail_live.ex:298-308.
+  # Algorithm copied from trail_live.ex:298-308.
   defp build_tree(rows) do
     by_parent = Enum.group_by(rows, & &1.parent_span_id)
     roots = Map.get(by_parent, nil, [])
@@ -143,11 +143,11 @@ defmodule SpanChain.Evals.Comparator do
   # --------------------------------------------------------------------------
 
   defp diff_trees(roots_a, roots_b) do
-    # GF-740: každý top-level pair je jedna logická větev. Marker
-    # `"deviation_point" => true` ide na PRVNÍ diff entry **uvnitř** každé
-    # větve, ne na globální index 0. Větve bez diff entries (identické
-    # podstromy) přispívají [] — `mark_deviation_points([])` no-op.
-    # @moduledoc spec: "první emitovaný diff per top-level branch".
+    # GF-740: each top-level pair is one logical branch. The marker
+    # `"deviation_point" => true` goes on the FIRST diff entry **inside** each
+    # branch, not on the global index 0. Branches with no diff entries (identical
+    # subtrees) contribute [] — `mark_deviation_points([])` is a no-op.
+    # @moduledoc spec: "the first emitted diff per top-level branch".
     roots_a
     |> pair_by_name(roots_b)
     |> Enum.flat_map(fn pair -> mark_deviation_points(diff_for_pair(pair)) end)
@@ -203,14 +203,14 @@ defmodule SpanChain.Evals.Comparator do
   end
 
   # Pair nodes by name preserving sibling order. For each unique name, zip
-  # the i-th node from a-list with the i-th from b-list (pozice = relativní
-  # pořadí mezi same-named siblings). Leftover → only_a/only_b.
+  # the i-th node from a-list with the i-th from b-list (position = relative
+  # order among same-named siblings). Leftover → only_a/only_b.
   defp pair_by_name(nodes_a, nodes_b) do
     by_name_a = group_with_order(nodes_a)
     by_name_b = group_with_order(nodes_b)
 
-    # Iterace přes union, ALE preserving order — MapSet by shufflo deviation_point
-    # napříč běhy. Order: nejdřív jména z a (insertion order), pak nová z b.
+    # Iterate over the union, BUT preserving order — a MapSet would shuffle deviation_point
+    # across runs. Order: first the names from a (insertion order), then new ones from b.
     all_names = Enum.uniq(Map.keys(by_name_a) ++ Map.keys(by_name_b))
 
     Enum.flat_map(all_names, fn n ->
@@ -252,10 +252,10 @@ defmodule SpanChain.Evals.Comparator do
 
   defp duration_ms(%{row: row}), do: duration_ms(row)
 
-  # Payload first: ISO8601 strings v payloadu mají sub-second precision.
-  # GF-669 projekční sloupce row.started_at/ended_at jsou truncated na :second
-  # (DateTime.truncate(:second) v Ledger.build_entry/7), což by sub-second
-  # durations vypočítalo na 0.
+  # Payload first: ISO8601 strings in the payload have sub-second precision.
+  # The GF-669 projection columns row.started_at/ended_at are truncated to :second
+  # (DateTime.truncate(:second) in Ledger.build_entry/7), which would compute sub-second
+  # durations as 0.
   defp duration_ms(%{payload: payload} = row) do
     case duration_from_payload(payload) do
       ms when is_integer(ms) -> ms

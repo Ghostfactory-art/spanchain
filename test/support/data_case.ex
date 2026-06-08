@@ -1,5 +1,5 @@
 defmodule SpanChain.DataCase do
-  @moduledoc "Sdílený sandbox-aware ExUnit case pro testy, které dotýkají Repa."
+  @moduledoc "Shared sandbox-aware ExUnit case for tests that touch the Repo."
 
   use ExUnit.CaseTemplate
 
@@ -18,10 +18,10 @@ defmodule SpanChain.DataCase do
       Ecto.Adapters.SQL.Sandbox.mode(SpanChain.Repo, {:shared, self()})
     end
 
-    # GF-667: Broadway processors a batchers se spouštějí v Application supervisor,
-    # takže nedědí test sandbox connection automaticky. Oficiální Broadway+Ecto
-    # recipe: attach telemetry handler který je per-test allow-ne na owner-pid.
-    # Bez tohoto Pipeline.handle_batch dostane DBConnection.OwnershipError.
+    # GF-667: Broadway processors and batchers start in the Application supervisor,
+    # so they don't inherit the test sandbox connection automatically. The official Broadway+Ecto
+    # recipe: attach a telemetry handler that per-test allows the owner-pid.
+    # Without this, Pipeline.handle_batch gets a DBConnection.OwnershipError.
     owner = self()
     handler_id = "broadway-sandbox-#{inspect(make_ref())}"
 
@@ -35,8 +35,8 @@ defmodule SpanChain.DataCase do
         try do
           Ecto.Adapters.SQL.Sandbox.allow(SpanChain.Repo, owner, self())
         rescue
-          # Handler může běžet i po skončení testu (Broadway flush v tail) — owner
-          # už dead → Sandbox.allow raise. Silent OK.
+          # The handler may run even after the test ends (Broadway flush in the tail) — the owner
+          # is already dead → Sandbox.allow raises. Silent OK.
           _ -> :ok
         end
       end,

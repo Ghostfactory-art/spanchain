@@ -1,5 +1,5 @@
 defmodule SpanChain.Ingestion.Router do
-  @moduledoc "Plug router pro OTLP-style ingestion endpoint POST /ingest."
+  @moduledoc "Plug router for the OTLP-style ingestion endpoint POST /ingest."
 
   use Plug.Router
   require Logger
@@ -12,11 +12,11 @@ defmodule SpanChain.Ingestion.Router do
     ValidationPlug
   }
 
-  # Auth před parsers: pokud token nesedí, neztrácíme CPU na parse velkého body.
+  # Auth before parsers: if the token doesn't match, we don't waste CPU parsing a large body.
   plug(AuthPlug)
 
-  # GF-766: per-API-key throttle ZA AuthPlug (ten odmítne neautorizované první),
-  # PŘED Plug.Parsers — blokovaný klient nesmí spálit CPU na parse JSON body.
+  # GF-766: per-API-key throttle AFTER AuthPlug (which rejects unauthorized first),
+  # BEFORE Plug.Parsers — a blocked client must not burn CPU parsing the JSON body.
   plug(SpanChain.Ingestion.RateLimiter)
 
   plug(Plug.Parsers,
@@ -25,8 +25,8 @@ defmodule SpanChain.Ingestion.Router do
     json_decoder: Jason
   )
 
-  # GF-767: po Plug.Parsers (potřebuje body_params), před :match. Path-scoped na
-  # /ingest — odmítne malformed run_id/agent_id dřív, než dorazí do SGS.
+  # GF-767: after Plug.Parsers (needs body_params), before :match. Path-scoped to
+  # /ingest — rejects malformed run_id/agent_id before it reaches the SGS.
   plug(SpanChain.Ingestion.ValidationPlug)
 
   plug(:match)
@@ -41,8 +41,8 @@ defmodule SpanChain.Ingestion.Router do
     end)
   end
 
-  # GF-649: OTLP/HTTP JSON endpoint. Translator je hloupý adaptér; downstream
-  # (SGS → Pipeline → Ledger) sdílí stejnou cestu jako /ingest.
+  # GF-649: OTLP/HTTP JSON endpoint. The translator is a dumb adapter; downstream
+  # (SGS → Pipeline → Ledger) shares the same path as /ingest.
   post "/v1/traces" do
     :telemetry.span([:gf, :otlp, :request], %{}, fn ->
       result = handle_otlp(conn)
@@ -56,12 +56,12 @@ defmodule SpanChain.Ingestion.Router do
     send_resp(conn, 200, "ok")
   end
 
-  # GF-706: Evals domain sub-router. AuthPlug už proběhl jako pipeline plug
-  # (forward dostane authenticated conn). MUSÍ být před `match _` catch-all.
+  # GF-706: Evals domain sub-router. AuthPlug has already run as a pipeline plug
+  # (forward receives an authenticated conn). MUST come before the `match _` catch-all.
   forward("/evals", to: SpanChain.Evals.Router)
 
-  # GF-712: Cassettes (Debug Replay VCR). Stejný pattern jako /evals —
-  # AuthPlug platí, MUSÍ být před `match _` catch-all.
+  # GF-712: Cassettes (Debug Replay VCR). Same pattern as /evals —
+  # AuthPlug applies, MUST come before the `match _` catch-all.
   forward("/cassettes", to: SpanChain.Cassettes.Router)
 
   match _ do
@@ -99,21 +99,21 @@ defmodule SpanChain.Ingestion.Router do
   defp handle_otlp(conn) do
     case OtlpTranslator.translate(conn.body_params) do
       {:ok, groups} ->
-        # GF-774: /v1/traces obchází ValidationPlug (path-scoped na /ingest), takže
-        # run_id z resource.attributes["service.instance.id"] musíme validovat tady,
-        # stejným regexem jako /ingest. Malformed (path traversal / >128 / nepovolené
-        # znaky) → odmítni CELÝ request (žádný partial ingest injection pokusu).
+        # GF-774: /v1/traces bypasses ValidationPlug (path-scoped to /ingest), so we must
+        # validate the run_id from resource.attributes["service.instance.id"] here,
+        # with the same regex as /ingest. Malformed (path traversal / >128 / disallowed
+        # characters) → reject the WHOLE request (no partial ingest of an injection attempt).
         if Enum.all?(groups, fn {run_id, _ev, _spans} -> ValidationPlug.valid_run_id?(run_id) end) do
-          # GF-706: groups je 3-tuple {run_id, eval_id_or_nil, spans}.
-          # GF-727: eval_id jde do SGS jak přes ensure_session opts (pro spawn
-          # path, init/1 ho perzistuje), TAK přes ingest_spans/3 opts (pro
-          # already-running SGS — late-binding v handle_call). Bez druhé cesty
-          # by druhý OTLP batch se stejným run_id ale novým gf.eval_id ztratil
-          # asociaci (existující SGS opts ignoruje).
-          # GF-849: per-group with/else (zrcadlí /ingest do_ingest/3) — když SGS vrátí
-          # {:error, reason} (crash/timeout přes ingest_spans try/catch, nebo spawn fail
-          # v ensure_session), loguj + pokračuj místo bare-match MatchError → 500, který
-          # tiše zahodil spany ze zbývajících groups. rejectedSpans nese reálný počet.
+          # GF-706: groups is a 3-tuple {run_id, eval_id_or_nil, spans}.
+          # GF-727: eval_id goes into the SGS both via ensure_session opts (for the spawn
+          # path, init/1 persists it) AND via ingest_spans/3 opts (for an
+          # already-running SGS — late-binding in handle_call). Without the second path
+          # a second OTLP batch with the same run_id but a new gf.eval_id would lose the
+          # association (an existing SGS ignores opts).
+          # GF-849: per-group with/else (mirrors /ingest do_ingest/3) — when the SGS returns
+          # {:error, reason} (crash/timeout via the ingest_spans try/catch, or a spawn fail
+          # in ensure_session), log + continue instead of a bare-match MatchError → 500, which
+          # silently dropped spans from the remaining groups. rejectedSpans carries the real count.
           {accepted_ids, accepted_spans, rejected_spans} =
             Enum.reduce(groups, {[], 0, 0}, fn {run_id, eval_id, spans}, {ids, acc, rej} ->
               with {:ok, _pid} <- SessionSupervisor.ensure_session(run_id, eval_id: eval_id),
@@ -126,7 +126,7 @@ defmodule SpanChain.Ingestion.Router do
               end
             end)
 
-          # OTLP spec: success = 200 (ne 202) + partialSuccess block i pro full success.
+          # OTLP spec: success = 200 (not 202) + a partialSuccess block even for full success.
           conn =
             put_json_resp(conn, 200, %{"partialSuccess" => %{"rejectedSpans" => rejected_spans}})
 

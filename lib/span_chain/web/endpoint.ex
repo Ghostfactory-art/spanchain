@@ -1,5 +1,5 @@
 defmodule SpanChain.Web.Endpoint do
-  @moduledoc "Phoenix endpoint pro Trail UI (port 4001). Oddělený od Plug /ingest na 4000."
+  @moduledoc "Phoenix endpoint for the Trail UI (port 4001). Separate from the Plug /ingest on 4000."
 
   use Phoenix.Endpoint, otp_app: :span_chain
 
@@ -15,15 +15,15 @@ defmodule SpanChain.Web.Endpoint do
     longpoll: [connect_info: [session: @session_options]]
   )
 
-  # GF-791/801: servíruje statický Records Bureau UI z priv/static. Od GF-801 je
-  # `index.html` Vite build output (entry = assets/index.html), stejně jako `app.js`
-  # + `app.css` (assets/ → priv/static/). `index.html` se servíruje na `/index.html`,
-  # ale NE `/` — root propadne do Routeru na PageController. MUSÍ být před
+  # GF-791/801: serves the static Records Bureau UI from priv/static. Since GF-801,
+  # `index.html` is a Vite build output (entry = assets/index.html), as are `app.js`
+  # + `app.css` (assets/ → priv/static/). `index.html` is served at `/index.html`,
+  # but NOT `/` — the root falls through to the Router's PageController. MUST come before
   # `plug SpanChain.Web.Router`.
-  # GF-801: `tokens.css` už NENÍ ve whitelistu — design tokeny jsou bundlované do
-  # `app.css` (main.jsx importuje src/styles/tokens.css) a žádný LiveView/React shell
-  # `/tokens.css` nelinkuje. `priv/static/tokens.css` zůstává tracked na disku, jen se
-  # už neservíruje.
+  # GF-801: `tokens.css` is NO LONGER in the whitelist — the design tokens are bundled into
+  # `app.css` (main.jsx imports src/styles/tokens.css) and no LiveView/React shell
+  # links `/tokens.css`. `priv/static/tokens.css` stays tracked on disk, it's just
+  # no longer served.
   plug(Plug.Static,
     at: "/",
     from: :span_chain,

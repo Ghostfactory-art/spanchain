@@ -1,11 +1,11 @@
 defmodule SpanChain.Harness do
   @moduledoc """
-  Observability wrapper kolem libovolného zákazníkova kódu — obaluje
-  `GenServer`, `Task`, plain funkci atd. a automaticky posílá spans do
-  Ledgeru přes `SessionGenServer` (same node, žádný HTTP roundtrip).
+  An observability wrapper around arbitrary customer code — it wraps
+  a `GenServer`, `Task`, a plain function, etc. and automatically sends spans to the
+  Ledger via `SessionGenServer` (same node, no HTTP roundtrip).
 
-  Harness **není agentní framework**: nediktuje jak zákazníkův kód řídí
-  svůj stav. Drží jen `active_spans` mapu a forwarduje hotové spans dál.
+  The Harness **is not an agent framework**: it does not dictate how the customer's code
+  manages its state. It holds only an `active_spans` map and forwards finished spans on.
 
   ## Example
 
@@ -14,12 +14,12 @@ defmodule SpanChain.Harness do
       result = SpanChain.Harness.with_span(h, "agent_run", %{task: "hello"}, fn ->
         "world"
       end)
-      # => "world"  (result je vrácen transparentně)
+      # => "world"  (the result is returned transparently)
 
       :ok = SpanChain.Harness.stop(h)
 
-  Vnořené spans přes explicitní `parent_span_id` (Harness nedrží žádný
-  globální stack — paralelní `Task.async` by ho rozbil):
+  Nested spans via an explicit `parent_span_id` (the Harness holds no
+  global stack — a parallel `Task.async` would break it):
 
       {:ok, parent_id} = SpanChain.Harness.start_span(h, "agent_run", %{})
 
@@ -30,9 +30,9 @@ defmodule SpanChain.Harness do
 
       :ok = SpanChain.Harness.end_span(h, parent_id, %{status: :ok})
 
-  Výjimka uvnitř `with_span` se zaloguje do spanu jako
-  `%{status: :error, error: inspect(e)}` a následně se **reraisuje** —
-  Harness nikdy nepohlcuje zákazníkovy výjimky ("let it crash").
+  An exception inside `with_span` is logged into the span as
+  `%{status: :error, error: inspect(e)}` and then **reraised** —
+  the Harness never swallows the customer's exceptions ("let it crash").
   """
 
   use GenServer
@@ -65,8 +65,8 @@ defmodule SpanChain.Harness do
   end
 
   @doc """
-  Otevře span. Vrací `{:ok, span_id}`. `parent_span_id` se předává v `opts`
-  (explicitní; žádný auto-stack).
+  Opens a span. Returns `{:ok, span_id}`. `parent_span_id` is passed in `opts`
+  (explicit; no auto-stack).
   """
   @spec start_span(GenServer.server(), String.t(), map(), keyword()) :: {:ok, span_id()}
   def start_span(pid, name, attributes \\ %{}, opts \\ []) when is_map(attributes) do
@@ -75,8 +75,8 @@ defmodule SpanChain.Harness do
   end
 
   @doc """
-  Zavře span a odešle do SessionGenServer. `end_attrs` se merguje do
-  `attributes` start_attrs — typicky `%{status: :ok}` nebo `%{status: :error}`.
+  Closes a span and sends it to the SessionGenServer. `end_attrs` is merged into
+  the start_attrs `attributes` — typically `%{status: :ok}` or `%{status: :error}`.
   """
   @spec end_span(GenServer.server(), span_id(), map()) :: :ok | {:error, :unknown_span_id}
   def end_span(pid, span_id, end_attrs \\ %{}) when is_map(end_attrs) do
@@ -84,10 +84,10 @@ defmodule SpanChain.Harness do
   end
 
   @doc """
-  Higher-order function: otevře span, vykoná `fun.()`, zavře span s výsledkem.
-  Výjimky propaguje ven po zalogování do spanu.
+  Higher-order function: opens a span, runs `fun.()`, closes the span with the result.
+  Propagates exceptions outward after logging them into the span.
 
-  Vrací přímo výsledek funkce — `with_span` je transparentní wrapper.
+  Returns the function's result directly — `with_span` is a transparent wrapper.
   """
   def with_span(pid, name, attributes, fun) when is_function(fun, 0) do
     with_span(pid, name, attributes, [], fun)
@@ -112,7 +112,7 @@ defmodule SpanChain.Harness do
     end
   end
 
-  @doc "Zastaví Harness. `terminate/2` flushne všechny `active_spans` jako abandoned."
+  @doc "Stops the Harness. `terminate/2` flushes all `active_spans` as abandoned."
   @spec stop(GenServer.server()) :: :ok
   def stop(pid), do: GenServer.stop(pid, :normal)
 

@@ -1,7 +1,7 @@
 defmodule SpanChain.Evals.RouterTest do
   @moduledoc """
-  HTTP tests pro /evals sub-router (GF-706). Forwardován z hlavního
-  `Ingestion.Router` na portu 4000. AuthPlug platí automaticky.
+  HTTP tests for the /evals sub-router (GF-706). Forwarded from the main
+  `Ingestion.Router` on port 4000. AuthPlug applies automatically.
   """
 
   use SpanChain.DataCase, async: false

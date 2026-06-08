@@ -1,24 +1,24 @@
 defmodule SpanChain.Ingestion.OtlpTranslator do
   @moduledoc """
-  Překládá OTLP/HTTP JSON (`ResourceSpans`) na interní ingest formát.
+  Translates OTLP/HTTP JSON (`ResourceSpans`) into the internal ingest format.
 
-  Translator je hloupý adaptér na HTTP hranici — neví nic o hash-chainu,
-  Broadway pipeline ani DB. Hexagonal architecture (Port & Adapter):
-  downstream `SessionGenServer.ingest_spans/2` přijímá náš normalizovaný
-  shape stejně jako spany z `/ingest`.
+  The translator is a dumb adapter at the HTTP boundary — it knows nothing about the
+  hash chain, the Broadway pipeline, or the DB. Hexagonal architecture (Port & Adapter):
+  the downstream `SessionGenServer.ingest_spans/2` accepts our normalized
+  shape the same way as spans from `/ingest`.
 
-  ## Mapování
+  ## Mapping
 
-  - `resource.attributes["service.instance.id"]` → interní `run_id`
-    (chybí → `{:error, :missing_run_id}`)
+  - `resource.attributes["service.instance.id"]` → internal `run_id`
+    (missing → `{:error, :missing_run_id}`)
   - `traceId` / `spanId` / `parentSpanId` — hex string passthrough
   - `startTimeUnixNano` / `endTimeUnixNano` (string ns) → ISO 8601
-    (microsecond precision; `DateTime` neumí nanosekundy)
-  - OTLP `KeyValue` atributy → flat `%{key => value}` mapa
-    (`stringValue`, `intValue`, `boolValue`, `doubleValue`; `arrayValue`/`kvlistValue` ignorováno — L3 scope)
-  - Neznámá OTLP pole (`kind`, `status`, `events`, `links`, ...) tiše ignorovány — L3 scope
+    (microsecond precision; `DateTime` cannot handle nanoseconds)
+  - OTLP `KeyValue` attributes → flat `%{key => value}` map
+    (`stringValue`, `intValue`, `boolValue`, `doubleValue`; `arrayValue`/`kvlistValue` ignored — L3 scope)
+  - Unknown OTLP fields (`kind`, `status`, `events`, `links`, ...) silently ignored — L3 scope
 
-  ## Příklad vstupu
+  ## Example input
 
       %{
         "resourceSpans" => [%{
@@ -68,8 +68,8 @@ defmodule SpanChain.Ingestion.OtlpTranslator do
 
   defp extract_run_id(_), do: {:error, :missing_run_id}
 
-  # GF-706: nepovinný eval_id — `nil` pokud chybí (NE error, žádný impact
-  # na ingest flow). Backend pasivně asociuje run s evalem v SGS init.
+  # GF-706: optional eval_id — `nil` if missing (NOT an error, no impact
+  # on the ingest flow). The backend passively associates the run with the eval in SGS init.
   defp extract_eval_id(%{"attributes" => attrs}) when is_list(attrs) do
     case find_string_attr(attrs, "gf.eval_id") do
       v when is_binary(v) and v != "" -> v
@@ -120,8 +120,8 @@ defmodule SpanChain.Ingestion.OtlpTranslator do
     |> DateTime.from_unix!(:nanosecond)
     |> DateTime.to_iso8601()
   rescue
-    # Graceful degradation: nevalidní timestamp neshodí celý request;
-    # span je přijat s `nil` started_at/ended_at.
+    # Graceful degradation: an invalid timestamp doesn't bring down the whole request;
+    # the span is accepted with `nil` started_at/ended_at.
     _ -> nil
   end
 
@@ -143,7 +143,7 @@ defmodule SpanChain.Ingestion.OtlpTranslator do
       when is_binary(k) and is_number(v) ->
         Map.put(acc, k, v)
 
-      # arrayValue, kvlistValue — L3 scope, tiše ignorováno
+      # arrayValue, kvlistValue — L3 scope, silently ignored
       _, acc ->
         acc
     end)

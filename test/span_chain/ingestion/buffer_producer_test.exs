@@ -19,11 +19,11 @@ defmodule SpanChain.Ingestion.BufferProducerTest do
     end)
   end
 
-  # GenStage process state je obalen v %GenStage{state: my_state} wrapperu —
-  # extrahuj naše interní state mapa.
+  # The GenStage process state is wrapped in a %GenStage{state: my_state} wrapper —
+  # extract our internal state map.
   defp my_state(pid), do: :sys.get_state(pid).state
 
-  test "enqueue puts messages do interní fronty (bez konzumenta)" do
+  test "enqueue puts messages into the internal queue (without a consumer)" do
     {pid, name} = start_isolated_buffer()
 
     :ok = BufferProducer.enqueue(name, [fake_entry(1), fake_entry(2), fake_entry(3)])
@@ -33,7 +33,7 @@ defmodule SpanChain.Ingestion.BufferProducerTest do
     assert state.demand == 0
   end
 
-  test "FIFO — queue.out vrací items v insertion order napříč více enqueue call" do
+  test "FIFO — queue.out returns items in insertion order across multiple enqueue calls" do
     {pid, name} = start_isolated_buffer()
 
     :ok = BufferProducer.enqueue(name, [fake_entry(1)])
@@ -52,7 +52,7 @@ defmodule SpanChain.Ingestion.BufferProducerTest do
     assert seqs == [1, 2, 3, 4]
   end
 
-  test "messages jsou obaleny do Broadway.Message s NoopAcknowledger" do
+  test "messages are wrapped in a Broadway.Message with NoopAcknowledger" do
     {pid, name} = start_isolated_buffer()
 
     :ok = BufferProducer.enqueue(name, [fake_entry(99)])
@@ -62,8 +62,8 @@ defmodule SpanChain.Ingestion.BufferProducerTest do
 
     assert %Broadway.Message{} = msg
     assert msg.data.seq == 99
-    # NoopAcknowledger vyžaduje canonical {Mod, nil, nil} tuple — ack/3 selže
-    # na non-nil ack_ref. Init function vrací správný format.
+    # NoopAcknowledger requires the canonical {Mod, nil, nil} tuple — ack/3 fails
+    # on a non-nil ack_ref. The init function returns the correct format.
     assert {Broadway.NoopAcknowledger, nil, nil} = msg.acknowledger
   end
 end

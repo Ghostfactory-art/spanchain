@@ -1,14 +1,14 @@
 defmodule SpanChain.Orchestrator do
   @moduledoc """
-  Orchestrator jako GenServer.
+  The Orchestrator as a GenServer.
 
-  Zodpovídá za:
-  - spawning agentů přes DynamicSupervisor
-  - routing tasků na správné agenty
-  - agregaci Trail (přehled všech runů)
-  - základní load balancing (round-robin na idle agenty)
+  Responsible for:
+  - spawning agents via the DynamicSupervisor
+  - routing tasks to the right agents
+  - aggregating the Trail (an overview of all runs)
+  - basic load balancing (round-robin over idle agents)
 
-  Toto je zárodek ROMA Planneru z GF AOS architektury.
+  This is the seed of the ROMA Planner from the GF AOS architecture.
   """
 
   use GenServer
@@ -24,37 +24,37 @@ defmodule SpanChain.Orchestrator do
     GenServer.start_link(__MODULE__, initial_state(), name: __MODULE__)
   end
 
-  @doc "Spawne nového agenta. Vrátí agent_id."
+  @doc "Spawns a new agent. Returns the agent_id."
   def spawn_agent(name \\ nil) do
     GenServer.call(__MODULE__, {:spawn_agent, name})
   end
 
-  @doc "Spustí task na konkrétním agentovi."
+  @doc "Runs a task on a specific agent."
   def run_task(agent_id, task) do
     GenServer.call(__MODULE__, {:run_task, agent_id, task}, 60_000)
   end
 
-  @doc "Spustí task na prvním idle agentovi (round-robin)."
+  @doc "Runs a task on the first idle agent (round-robin)."
   def dispatch(task) do
     GenServer.call(__MODULE__, {:dispatch, task}, 60_000)
   end
 
-  @doc "Spustí tentýž task na více agentech paralelně. Základ pro evals."
+  @doc "Runs the same task on multiple agents in parallel. The basis for evals."
   def eval_run(task, agent_ids) do
     GenServer.call(__MODULE__, {:eval_run, task, agent_ids}, 120_000)
   end
 
-  @doc "Vrátí celý Trail — všechny runy se Ledgery."
+  @doc "Returns the whole Trail — all runs with their Ledgers."
   def get_trail do
     GenServer.call(__MODULE__, :get_trail)
   end
 
-  @doc "Vrátí přehled všech agentů."
+  @doc "Returns an overview of all agents."
   def list_agents do
     GenServer.call(__MODULE__, :list_agents)
   end
 
-  @doc "Vypíše Trail přehledně do konzole."
+  @doc "Prints the Trail neatly to the console."
   def print_trail do
     trail = get_trail()
 
@@ -133,8 +133,8 @@ defmodule SpanChain.Orchestrator do
 
   @impl true
   def handle_call({:eval_run, task, agent_ids}, _from, state) do
-    # Paralelní exekuce na více agentech — základ pro evals
-    # Každý agent dostane tentýž task, výsledky se porovnají
+    # Parallel execution across multiple agents — the basis for evals
+    # Each agent gets the same task, the results are compared
     results =
       agent_ids
       |> Task.async_stream(
@@ -216,8 +216,8 @@ defmodule SpanChain.Orchestrator do
   end
 
   defp pick_idle_agent(state) do
-    # Zjednodušeno: vrátí libovolného agenta
-    # V produkci: zkontroluj status přes Agent.get_state/1
+    # Simplified: returns an arbitrary agent
+    # In production: check the status via Agent.get_state/1
     case Map.keys(state.agents) do
       [] -> nil
       [id | _] -> id

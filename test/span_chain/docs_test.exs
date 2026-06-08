@@ -1,8 +1,8 @@
 defmodule SpanChain.DocsTest do
   @moduledoc """
-  GF-743: Sanity check že `docs/architecture-map.md` zmiňuje každý modul
-  v `lib/span_chain/` a klíčové Sprint 8 artefakty. Brání tichému driftu
-  mezi kódem a living-reference dokumentací.
+  GF-743: Sanity check that `docs/architecture-map.md` mentions every module
+  in `lib/span_chain/` and the key Sprint 8 artifacts. Prevents silent drift
+  between the code and the living-reference documentation.
   """
 
   use ExUnit.Case, async: true
@@ -29,7 +29,7 @@ defmodule SpanChain.DocsTest do
 
       for mod <- top_level_modules do
         assert mentions?(content, mod),
-               "architecture-map.md neobsahuje zmínku o top-level modulu: #{mod}"
+               "architecture-map.md does not mention top-level module: #{mod}"
       end
     end
 
@@ -42,7 +42,7 @@ defmodule SpanChain.DocsTest do
 
       for mod <- ingestion_modules do
         assert mentions?(content, mod),
-               "architecture-map.md neobsahuje zmínku o ingestion modulu: #{mod}"
+               "architecture-map.md does not mention ingestion module: #{mod}"
       end
     end
 
@@ -60,7 +60,7 @@ defmodule SpanChain.DocsTest do
 
       for marker <- sprint_8_markers do
         assert String.contains?(content, marker),
-               "architecture-map.md neobsahuje Sprint 8 marker: #{marker}"
+               "architecture-map.md does not contain Sprint 8 marker: #{marker}"
       end
     end
 
@@ -77,16 +77,16 @@ defmodule SpanChain.DocsTest do
 
       for section <- required_sections do
         assert String.contains?(content, section),
-               "architecture-map.md chybí sekce obsahující: #{section}"
+               "architecture-map.md is missing a section containing: #{section}"
       end
     end
   end
 
-  # Substring search robustní vůči obojímu naming convention:
+  # Substring search robust to both naming conventions:
   # - concatenated camel:  `session_gen_server.ex` → defmodule SessionGenServer → "SessionGenServer"
   # - dotted module path:  `ledger_behaviour.ex`   → defmodule Ledger.Behaviour  → "Ledger.Behaviour"
-  # Bez tohoto by `ledger_behaviour` falešně failoval, protože arch-map mention
-  # je `Ledger.Behaviour` (s tečkou), ne `LedgerBehaviour`.
+  # Without this, `ledger_behaviour` would falsely fail, because the arch-map mention
+  # is `Ledger.Behaviour` (with a dot), not `LedgerBehaviour`.
   defp mentions?(content, basename) do
     segments = basename |> String.split("_") |> Enum.map(&String.capitalize/1)
     camel = Enum.join(segments, "")

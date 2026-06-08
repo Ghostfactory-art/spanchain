@@ -1,5 +1,5 @@
 defmodule SpanChain.Ingestion.TelemetryLogger do
-  @moduledoc "Loguje všechny `[:gf, ...]` telemetry eventy přes Logger — debug-only handler."
+  @moduledoc "Logs all `[:gf, ...]` telemetry events via Logger — debug-only handler."
 
   require Logger
 
@@ -20,7 +20,7 @@ defmodule SpanChain.Ingestion.TelemetryLogger do
 
   @handler_id "gf-telemetry-logger"
 
-  @doc "Připojí handler. Idempotentní — re-attach na již existující ID je no-op."
+  @doc "Attaches the handler. Idempotent — re-attaching an already-existing ID is a no-op."
   def attach do
     :telemetry.detach(@handler_id)
 

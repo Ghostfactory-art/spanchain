@@ -3,10 +3,10 @@ defmodule SpanChain.DeadLetterTest do
 
   alias SpanChain.DeadLetter
 
-  # GF-667: retry behavior + dead-letter emission z SGS odstraněno (test seamy
-  # insert_fun + retry_delay_ms zmizely při SGS slim refactoru). Retry logika
-  # se přesunula do Pipeline.handle_batch; její dead-letter integrace je
-  # pokryta v pipeline_test.exs. Tady ponecháváme jen unit testy
+  # GF-667: retry behavior + dead-letter emission removed from the SGS (the test seams
+  # insert_fun + retry_delay_ms disappeared in the SGS slim refactor). The retry logic
+  # moved into Pipeline.handle_batch; its dead-letter integration is
+  # covered in pipeline_test.exs. Here we keep only unit tests of the
   # SpanChain.DeadLetter public API (store/list/resolve).
 
   defp fresh_run_id, do: "dl-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower)

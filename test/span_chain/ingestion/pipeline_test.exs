@@ -4,15 +4,15 @@ defmodule SpanChain.Ingestion.PipelineTest do
   alias SpanChain.Ingestion.BufferProducer
   alias SpanChain.Ledger
 
-  # Pipeline + BufferProducer běží v Application supervision tree v test env
+  # Pipeline + BufferProducer run in the Application supervision tree in the test env
   # (per config/test.exs: start_broadway_pipeline: true, producer_module: BufferProducer).
-  # DataCase attachne telemetry handler pro Sandbox.allow na Broadway processory.
+  # DataCase attaches a telemetry handler for Sandbox.allow on the Broadway processors.
 
   defp fresh_run_id, do: "pipe-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower)
 
-  # Pipeline + BufferProducer jsou singleton v Application supervisor — testy
-  # sdílejí pipeline → handler dostává events ze všech paralelních testů.
-  # Filtrace na konkrétní `run_id` přes `run_ids` v metadata izoluje events.
+  # Pipeline + BufferProducer are singletons in the Application supervisor — tests
+  # share the pipeline → the handler receives events from all parallel tests.
+  # Filtering on a specific `run_id` via `run_ids` in the metadata isolates the events.
   defp attach_flush_handler(run_id) do
     test_pid = self()
     ref = make_ref()
@@ -31,16 +31,16 @@ defmodule SpanChain.Ingestion.PipelineTest do
     ref
   end
 
-  test "BufferProducer.enqueue → Pipeline.handle_batch → row v DB (happy path)" do
+  test "BufferProducer.enqueue → Pipeline.handle_batch → row in DB (happy path)" do
     run_id = fresh_run_id()
     ref = attach_flush_handler(run_id)
 
     entry = Ledger.build_entry(run_id, 0, 0, nil, "span", %{"x" => 1}, nil)
     :ok = BufferProducer.enqueue([entry])
 
-    # Sdílená Pipeline + parallel test files = batch může obsahovat entries z více
-    # run_ids → count v measurements odráží celý batch, ne jen moje. Filter
-    # handler vystřelí když je můj run_id v batchi, dál ověřujeme DB.
+    # A shared Pipeline + parallel test files = a batch may contain entries from multiple
+    # run_ids → the count in measurements reflects the whole batch, not just ours. The filter
+    # handler fires when our run_id is in the batch, then we verify the DB.
     assert_receive {:flushed, ^ref, _measurements}, 2_000
 
     row = Repo.one(from(l in Ledger, where: l.run_id == ^run_id))
@@ -55,7 +55,7 @@ defmodule SpanChain.Ingestion.PipelineTest do
 
     payload = %{"span_id" => "s1", "status" => "error", "started_at" => "2026-05-15T10:00:00Z"}
     entry = Ledger.build_entry(run_id, 0, 0, nil, "span", payload, nil)
-    # status je projekce vytvořená v build_entry PO compute_hash (hash beze změny).
+    # status is a projection created in build_entry AFTER compute_hash (hash unchanged).
     assert entry.status == "error"
 
     :ok = BufferProducer.enqueue([entry])
@@ -65,7 +65,7 @@ defmodule SpanChain.Ingestion.PipelineTest do
     assert row.status == "error"
   end
 
-  test "ordering — 5 entries pro stejný run_id v seq order po DB roundtripu" do
+  test "ordering — 5 entries for the same run_id in seq order after a DB roundtrip" do
     run_id = fresh_run_id()
     ref = attach_flush_handler(run_id)
 
@@ -83,11 +83,11 @@ defmodule SpanChain.Ingestion.PipelineTest do
       |> Repo.all()
 
     assert Enum.map(rows, & &1.seq) == [0, 1, 2, 3, 4]
-    # Hash chain je validní po DB roundtripu — verify_ledger ověří kontinuitu
+    # The hash chain is valid after the DB roundtrip — verify_ledger checks continuity
     assert {:ok, 5} = Ledger.verify_ledger(run_id)
   end
 
-  test "batch flush — 50 spans projdou pipeline + jsou v DB" do
+  test "batch flush — 50 spans go through the pipeline + are in the DB" do
     run_id = fresh_run_id()
     ref = attach_flush_handler(run_id)
 
@@ -98,13 +98,13 @@ defmodule SpanChain.Ingestion.PipelineTest do
       end)
 
     :ok = BufferProducer.enqueue(entries)
-    # Počkat dokud kumulativní inserts pro náš run_id ≥ 50 (může to být víc batchů)
+    # Wait until the cumulative inserts for our run_id ≥ 50 (it may be more than one batch)
     :ok = wait_for_run_count(ref, run_id, 50, 5_000)
 
     assert Repo.aggregate(from(l in Ledger, where: l.run_id == ^run_id), :count, :id) == 50
   end
 
-  # Pollovat Repo místo dovozování count z events (cleanest).
+  # Poll the Repo instead of deriving the count from events (cleanest).
   defp wait_for_run_count(_ref, run_id, expected, timeout_ms) do
     deadline = System.monotonic_time(:millisecond) + timeout_ms
     do_wait_count(run_id, expected, deadline)
@@ -121,9 +121,9 @@ defmodule SpanChain.Ingestion.PipelineTest do
         {:error, {:timeout, count, expected}}
 
       true ->
-        # OK Process.sleep v integration testech které čekají na external async work
-        # (Broadway batch_timeout) — alternativa by byla cumulative receive loop, ale
-        # batch obsahuje entries z více tests → count není deterministický.
+        # Process.sleep is OK in integration tests that wait for external async work
+        # (Broadway batch_timeout) — the alternative would be a cumulative receive loop, but
+        # a batch contains entries from multiple tests → the count is not deterministic.
         Process.sleep(20)
         do_wait_count(run_id, expected, deadline)
     end
@@ -148,7 +148,7 @@ defmodule SpanChain.Ingestion.PipelineTest do
       run = Repo.get(Run, run_id)
       assert run != nil
       assert run.status == "running"
-      # GF-790: started_at je nejstarší span started_at z dávky, ne čas insertu.
+      # GF-790: started_at is the oldest span started_at from the batch, not the insert time.
       assert DateTime.compare(run.started_at, ~U[2026-05-15 10:00:00Z]) == :eq
     end
 
@@ -156,8 +156,8 @@ defmodule SpanChain.Ingestion.PipelineTest do
       run_id = fresh_run_id() <> "-idem-run"
       Repo.insert!(%Run{run_id: run_id, status: "completed"})
 
-      # GF-790: on_conflict aktualizuje POUZE started_at (LEAST) → status "completed"
-      # zůstává nedotčený. Druhé volání nesmí hodit.
+      # GF-790: on_conflict updates ONLY started_at (LEAST) → the status "completed"
+      # stays untouched. The second call must not throw.
       assert Pipeline.ensure_run_records([entry_with(run_id)]) == :ok
       assert Repo.get(Run, run_id).status == "completed"
     end
@@ -185,14 +185,14 @@ defmodule SpanChain.Ingestion.PipelineTest do
 
       assert DateTime.compare(Repo.get(Run, run_id).started_at, ~U[2026-05-15 10:00:05Z]) == :eq
 
-      # Batch 2: starší 10:00:01 → LEAST vybere starší hodnotu
+      # Batch 2: older 10:00:01 → LEAST picks the older value
       assert Pipeline.ensure_run_records([
                entry_with(run_id, payload: %{"started_at" => "2026-05-15T10:00:01Z"})
              ]) == :ok
 
       assert DateTime.compare(Repo.get(Run, run_id).started_at, ~U[2026-05-15 10:00:01Z]) == :eq
 
-      # Batch 3: novější 10:00:09 → LEAST drží stávající starší hodnotu
+      # Batch 3: newer 10:00:09 → LEAST keeps the existing older value
       assert Pipeline.ensure_run_records([
                entry_with(run_id, payload: %{"started_at" => "2026-05-15T10:00:09Z"})
              ]) == :ok
@@ -242,8 +242,8 @@ defmodule SpanChain.Ingestion.PipelineTest do
       assert Pipeline.ensure_eval_records([entry_with(run_id, eval_id: first)]) == :ok
       assert Repo.get(Run, run_id).eval_id == first
 
-      # Druhý batch s jiným eval_id → Eval řádek pro `second` vznikne, ale
-      # runs.eval_id zůstane `first` (COALESCE).
+      # The second batch with a different eval_id → an Eval row for `second` is created, but
+      # runs.eval_id stays `first` (COALESCE).
       assert Pipeline.ensure_eval_records([entry_with(run_id, eval_id: second)]) == :ok
       assert %Eval{} = Repo.get(Eval, second)
       assert Repo.get(Run, run_id).eval_id == first
@@ -262,7 +262,7 @@ defmodule SpanChain.Ingestion.PipelineTest do
       assert Repo.get(Eval, eval_id) != nil
       assert Repo.get(Run, run_id).eval_id == eval_id
 
-      # Ledger entry musí být insertnutá BEZ :eval_id sloupce (jen schema fields).
+      # The Ledger entry must be inserted WITHOUT the :eval_id column (schema fields only).
       ledger_row = Repo.one(from(l in Ledger, where: l.run_id == ^run_id))
       assert ledger_row != nil
       assert ledger_row.event_type == "span"
@@ -326,7 +326,7 @@ defmodule SpanChain.Ingestion.PipelineTest do
       assert run.temperature == 0.7
       assert run.version == "v1.0"
 
-      # Druhý batch s jinými hodnotami → COALESCE first-wins, žádná změna
+      # The second batch with different values → COALESCE first-wins, no change
       entry2 = put_in(entry.payload["attributes"]["gf.agent.model"], "claude-opus-4-7")
       Pipeline.upsert_agent_configs([entry2])
 

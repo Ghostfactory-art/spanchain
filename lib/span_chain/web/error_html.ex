@@ -1,5 +1,5 @@
 defmodule SpanChain.Web.ErrorHTML do
-  @moduledoc "Minimální HTML rendering pro Phoenix error pages."
+  @moduledoc "Minimal HTML rendering for Phoenix error pages."
 
   use Phoenix.Component
 

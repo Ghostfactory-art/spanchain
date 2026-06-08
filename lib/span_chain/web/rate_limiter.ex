@@ -1,19 +1,19 @@
 defmodule SpanChain.Web.RateLimiter do
   @moduledoc """
-  Throttle pro Phoenix port 4001 (`plug_attack`) — flood ochrana pro `/api` (Bearer-gated)
-  i veřejné `/trail` (GF-851). Zrcadlí chování `Ingestion.RateLimiter` (429 + Retry-After,
-  test seam `:rate_limit_enabled`), ale s dvojím klíčem a oddělenými ETS tabulkami:
+  Throttle for Phoenix port 4001 (`plug_attack`) — flood protection for `/api` (Bearer-gated)
+  and the public `/trail` (GF-851). Mirrors the behavior of `Ingestion.RateLimiter` (429 + Retry-After,
+  test seam `:rate_limit_enabled`), but with a dual key and separate ETS tables:
 
     * `:api`     — `["Bearer " <> token]` → throttle per token (storage `#{__MODULE__}.Api`)
-    * `:browser` — bez tokenu (`/trail`) → throttle per client IP (storage `#{__MODULE__}.Trail`)
+    * `:browser` — no token (`/trail`) → throttle per client IP (storage `#{__MODULE__}.Trail`)
 
-  Oddělené tabulky drží `/api` a `/trail` buckety nezávislé (flood na jeden nevyčerpá druhý)
-  a nesdílí bucket s portem 4000. Limity zrcadlí port 4000 přes stejné config klíče.
+  Separate tables keep the `/api` and `/trail` buckets independent (a flood on one doesn't exhaust the other)
+  and don't share a bucket with port 4000. The limits mirror port 4000 via the same config keys.
 
-  Client IP nečteme z `conn.remote_ip` (za Caddy proxy je to IP proxy → všichni návštěvníci
-  by sdíleli jeden bucket). Caddy přidává `x-forwarded-for` s reálnou client IP; lokální curl
-  bez proxy spadne na `conn.remote_ip`. Pozn.: XFF je klientem spoofovatelný — robustnější
-  řešení je `Plug.RemoteIp` (vyžaduje novou dependency → Later).
+  We don't read the client IP from `conn.remote_ip` (behind the Caddy proxy that's the proxy IP → all visitors
+  would share one bucket). Caddy adds `x-forwarded-for` with the real client IP; a local curl
+  without the proxy falls back to `conn.remote_ip`. Note: XFF is client-spoofable — a more robust
+  solution is `Plug.RemoteIp` (requires a new dependency → Later).
   """
 
   import Plug.Conn
@@ -22,7 +22,7 @@ defmodule SpanChain.Web.RateLimiter do
   @api_storage __MODULE__.Api
   @trail_storage __MODULE__.Trail
 
-  # `:api` (Bearer) → per token; `:browser` (`/trail`, bez tokenu) → per client IP.
+  # `:api` (Bearer) → per token; `:browser` (`/trail`, no token) → per client IP.
   rule "throttle api by token, trail by ip", conn do
     case get_req_header(conn, "authorization") do
       ["Bearer " <> token] ->
@@ -54,8 +54,8 @@ defmodule SpanChain.Web.RateLimiter do
   defp period, do: Application.get_env(:span_chain, :rate_limit_period_ms, 60_000)
   defp limit, do: Application.get_env(:span_chain, :rate_limit_count, 1_000)
 
-  # Test seam: rate_limit_enabled: false (config/test.exs) vypne throttle bez závislosti
-  # na ETS timingu. call/2 je v PlugAttack defoverridable; super/2 spustí plug_attack_call.
+  # Test seam: rate_limit_enabled: false (config/test.exs) disables the throttle without depending
+  # on ETS timing. call/2 is defoverridable in PlugAttack; super/2 runs plug_attack_call.
   def call(conn, opts) do
     if Application.get_env(:span_chain, :rate_limit_enabled, true) do
       super(conn, opts)
@@ -64,8 +64,8 @@ defmodule SpanChain.Web.RateLimiter do
     end
   end
 
-  # Nad limit: 429 + JSON + Retry-After (sekundy do resetu okna; data[:expires_at] je unix
-  # čas v ms). Žádný raise — pouze response + halt(). Zrcadlí Ingestion.RateLimiter.
+  # Over the limit: 429 + JSON + Retry-After (seconds until the window resets; data[:expires_at] is unix
+  # time in ms). No raise — only response + halt(). Mirrors Ingestion.RateLimiter.
   def block_action(conn, {:throttle, data}, _opts) do
     retry_after = max(div(data[:expires_at] - System.system_time(:millisecond), 1000), 1)
 

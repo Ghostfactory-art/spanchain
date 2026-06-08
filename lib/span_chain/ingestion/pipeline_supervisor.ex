@@ -1,44 +1,44 @@
 defmodule SpanChain.Ingestion.PipelineSupervisor do
   @moduledoc """
-  `:rest_for_one` supervisor obalující `BufferRegistry` a `Pipeline` (GF-672).
+  `:rest_for_one` supervisor wrapping `BufferRegistry` and `Pipeline` (GF-672).
 
-  ## Proč `:rest_for_one`
+  ## Why `:rest_for_one`
 
-  `BufferProducer` žije UVNITŘ Broadway supervision tree pod `Pipeline`, ne přímo
-  pod tímto supervisorem. V `BufferProducer.init/1` se registruje v
-  `BufferRegistry` pod klíčem `:singleton`; `SessionGenServer.enqueue/1` ho najde
-  přes `Registry.lookup`.
+  `BufferProducer` lives INSIDE the Broadway supervision tree under `Pipeline`, not directly
+  under this supervisor. In `BufferProducer.init/1` it registers itself in
+  `BufferRegistry` under the key `:singleton`; `SessionGenServer.enqueue/1` finds it
+  via `Registry.lookup`.
 
-  Kdyby strategie byla `:one_for_one`, pád `BufferRegistry` by způsobil restart
-  jen samotného Registry — fresh ETS bez registrací. Broadway-interní
-  `BufferProducer` by však zůstal naživu a `init/1` se znovu nezavolal →
-  re-registrace by neproběhla → SGS lookups by tiše vracely
+  If the strategy were `:one_for_one`, a crash of `BufferRegistry` would restart
+  only the Registry itself — a fresh ETS with no registrations. The Broadway-internal
+  `BufferProducer` would, however, stay alive and `init/1` would not be called again →
+  re-registration would not happen → SGS lookups would silently return
   `{:error, :no_producer}`.
 
-  `:rest_for_one` restartuje crashnuté dítě **a všechna další za ním**, takže
-  pád `BufferRegistry` cascade restartuje `Pipeline` → Broadway respawne
-  `BufferProducer` → `init/1` re-registruje `:singleton` v fresh Registry →
-  SGS lookups okamžitě fungují.
+  `:rest_for_one` restarts the crashed child **and all children after it**, so a
+  crash of `BufferRegistry` cascade-restarts `Pipeline` → Broadway respawns
+  `BufferProducer` → `init/1` re-registers `:singleton` in the fresh Registry →
+  SGS lookups work immediately.
 
-  ## Pořadí dětí je záměrné
+  ## The child order is deliberate
 
-  `BufferRegistry` MUSÍ být před `Pipeline` — `:rest_for_one` restartuje pouze
-  děti **za** crashnutým procesem. Obrácené pořadí by ponechalo `Pipeline`
-  živou při Registry crashi, čímž by zpětvazba selhala (viz výše).
+  `BufferRegistry` MUST come before `Pipeline` — `:rest_for_one` restarts only the
+  children **after** the crashed process. The reverse order would leave `Pipeline`
+  alive on a Registry crash, breaking the feedback loop (see above).
 
   ## Scope
 
-  Tento sub-supervisor záměrně obaluje pouze `[BufferRegistry, Pipeline]`. Root
-  `SpanChain.Supervisor` zůstává `:one_for_one`, takže crash uvnitř ingest
-  pipeline nemá blast radius na `SessionSupervisor` / HTTP listener / Phoenix
+  This sub-supervisor deliberately wraps only `[BufferRegistry, Pipeline]`. The root
+  `SpanChain.Supervisor` stays `:one_for_one`, so a crash inside the ingest
+  pipeline has no blast radius on `SessionSupervisor` / the HTTP listener / the Phoenix
   Endpoint / PubSub.
 
-  ## Známý edge case (GF-724)
+  ## Known edge case (GF-724)
 
-  `Process.exit(reg, :kill)` přímo na BufferRegistry supervisor způsobí ETS
-  name race během `:rest_for_one` restartu → root supervisor exit. Working as
-  Intended pro `:kill` signál; production-realistic failure mody (individual
-  Registry partition crash) self-recovery fungují. L3 followup: GF-729.
+  `Process.exit(reg, :kill)` directly on the BufferRegistry supervisor causes an ETS
+  name race during the `:rest_for_one` restart → root supervisor exit. Working as
+  Intended for the `:kill` signal; for production-realistic failure modes (individual
+  Registry partition crash) self-recovery works. L3 followup: GF-729.
   """
 
   use Supervisor

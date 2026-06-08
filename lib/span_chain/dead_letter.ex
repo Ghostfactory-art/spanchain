@@ -1,17 +1,17 @@
 defmodule SpanChain.DeadLetter do
   @moduledoc """
-  Záchranná síť pro batche, které selhaly při zápisu do Ledgeru po vyčerpání retry.
+  A safety net for batches that failed to write to the Ledger after retries were exhausted.
 
-  Záznamy v `dead_letter_entries` **nejsou součástí hash-chainu** — jsou to
-  orphaned spans pro ruční inspekci nebo offline reprocessing. Hash-chain
-  v Ledgeru pokračuje bez nich (`seq` / `prev_hash` se počítá jakoby insert
-  proběhl), takže `verify_ledger/1` na chybějících řádcích selže — to je
-  záměrné, dead-letter explicitně signalizuje "tady jsou data, ale chybí
-  v autoritativním zdroji".
+  Records in `dead_letter_entries` are **not part of the hash chain** — they are
+  orphaned spans for manual inspection or offline reprocessing. The hash chain
+  in the Ledger continues without them (`seq` / `prev_hash` is computed as if the insert
+  had happened), so `verify_ledger/1` fails on the missing rows — that is
+  intentional; the dead-letter explicitly signals "here is the data, but it is missing
+  from the authoritative source".
 
-  `store/3` je defenzivní — pokud i ten zápis selže (DB úplně down), jen
-  zaloguje a vrátí `{:error, reason}`. GenServer volajícího se nesmí crashnout
-  jen proto, že záchranná síť nefunguje.
+  `store/3` is defensive — if even that write fails (DB completely down), it just
+  logs and returns `{:error, reason}`. The caller's GenServer must not crash
+  just because the safety net is down.
   """
 
   use Ecto.Schema
@@ -47,8 +47,8 @@ defmodule SpanChain.DeadLetter do
   # --------------------------------------------------------------------------
 
   @doc """
-  Uloží neúspěšný batch jako dead-letter záznam. Vrací `{:ok, %DeadLetter{}}`
-  nebo `{:error, reason}` — nikdy nevyhazuje výjimku ven (try/rescue + log).
+  Stores a failed batch as a dead-letter record. Returns `{:ok, %DeadLetter{}}`
+  or `{:error, reason}` — never raises an exception outward (try/rescue + log).
   """
   @spec store(String.t(), [map()], term()) :: {:ok, t()} | {:error, term()}
   def store(run_id, batch, reason) when is_binary(run_id) and is_list(batch) do
@@ -82,7 +82,7 @@ defmodule SpanChain.DeadLetter do
     end
   end
 
-  @doc "Vrátí všechny nevyřešené dead-letter záznamy (chronologicky)."
+  @doc "Returns all unresolved dead-letter records (chronologically)."
   @spec list_unresolved() :: [t()]
   def list_unresolved do
     from(d in __MODULE__, where: d.resolved == false, order_by: [asc: d.inserted_at])
@@ -90,8 +90,8 @@ defmodule SpanChain.DeadLetter do
   end
 
   @doc """
-  Označí dead-letter záznam jako vyřešený. `resolved_at` se nastaví automaticky
-  přes `timestamps(updated_at: :resolved_at)`.
+  Marks a dead-letter record as resolved. `resolved_at` is set automatically
+  via `timestamps(updated_at: :resolved_at)`.
   """
   @spec resolve(integer()) :: {:ok, t()} | {:error, :not_found | Ecto.Changeset.t()}
   def resolve(id) when is_integer(id) do

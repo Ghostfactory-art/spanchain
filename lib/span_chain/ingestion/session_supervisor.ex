@@ -1,17 +1,17 @@
 defmodule SpanChain.Ingestion.SessionSupervisor do
   @moduledoc """
-  DynamicSupervisor wrapper — race-safe spawn SessionGenServer per run_id.
+  DynamicSupervisor wrapper — race-safe spawn of a SessionGenServer per run_id.
 
   ## Crash recovery (GF-775)
 
-  SGS je `restart: :temporary` → crash NEauto-restartuje. `ensure_session/1` na
-  prázdný Registry zjistí přes DB jestli `run_id` existuje:
-  - **nový run** → spawn s epoch 0, prev_hash nil (defaulty).
-  - **restart** (run v DB) → drain in-flight staré epochy (PubSub `epoch_flush:`),
-    pak spawn s `epoch_id+1` a `prev_hash` = poslední commitnutý hash (zachová
-    GF-666 cross-epoch kontinuitu → `verify_ledger/1` zůstane `{:ok, _}`).
+  The SGS is `restart: :temporary` → a crash does NOT auto-restart. `ensure_session/1` on
+  an empty Registry checks the DB for whether the `run_id` exists:
+  - **new run** → spawn with epoch 0, prev_hash nil (defaults).
+  - **restart** (run in the DB) → drain in-flight spans of the old epoch (PubSub `epoch_flush:`),
+    then spawn with `epoch_id+1` and `prev_hash` = the last committed hash (preserves
+    GF-666 cross-epoch continuity → `verify_ledger/1` stays `{:ok, _}`).
 
-  Repo read žije VÝHRADNĚ zde — SGS zůstává Repo-free (GF-751).
+  The Repo read lives EXCLUSIVELY here — the SGS stays Repo-free (GF-751).
   """
 
   import Ecto.Query, only: [from: 2]
@@ -24,21 +24,21 @@ defmodule SpanChain.Ingestion.SessionSupervisor do
   @supervisor __MODULE__
   @registry SpanChain.Ingestion.SessionRegistry
 
-  @doc "Child spec pro Supervisor v Application."
+  @doc "Child spec for the Supervisor in Application."
   def child_spec(_opts) do
     DynamicSupervisor.child_spec(name: @supervisor, strategy: :one_for_one)
   end
 
   @doc """
-  Vrátí pid SessionGenServeru pro `run_id`. Pokud session neexistuje,
-  spawnne ji. Race condition mezi dvěma současnými calls je explicitně
-  ošetřena přes `{:error, {:already_started, pid}}`.
+  Returns the pid of the SessionGenServer for `run_id`. If the session does not exist,
+  spawns it. The race condition between two concurrent calls is explicitly
+  handled via `{:error, {:already_started, pid}}`.
 
-  Volitelné `opts`:
-    * `:eval_id` (GF-706) — pasivní associace `run` ↔ `eval` při SGS init.
-      Spawn-time-only: opts se aplikují jen pokud se SGS skutečně spawne
-      (existující SGS pro stejný run_id ignoruje opts — eval_id už byl
-      perzistován v jeho init).
+  Optional `opts`:
+    * `:eval_id` (GF-706) — passive association `run` ↔ `eval` at SGS init.
+      Spawn-time-only: opts are applied only if the SGS actually spawns
+      (an existing SGS for the same run_id ignores opts — eval_id was already
+      persisted in its init).
   """
   @spec ensure_session(String.t(), keyword()) :: {:ok, pid()} | {:error, term()}
   def ensure_session(run_id, opts \\ []) when is_binary(run_id) do
@@ -51,24 +51,24 @@ defmodule SpanChain.Ingestion.SessionSupervisor do
     end
   end
 
-  # GF-775: Registry prázdný → buď nový run, nebo restart (run už je v DB).
-  # Recovery: drain staré epochy, pak spawn s novou epochou + carried prev_hash.
+  # GF-775: Registry empty → either a new run, or a restart (the run is already in the DB).
+  # Recovery: drain the old epoch, then spawn with a new epoch + carried prev_hash.
   defp recover_or_spawn(run_id, opts) do
     case fetch_last_epoch(run_id) do
       nil ->
-        # Nový run — žádné DB záznamy. Defaulty epoch 0 / prev_hash nil.
+        # New run — no DB records. Defaults epoch 0 / prev_hash nil.
         spawn_session(run_id, opts)
 
       last_epoch ->
-        # Restart. Počkej až in-flight spany staré epochy commitnou, pak přečti
-        # skutečný poslední hash (Postgres read-after-write po commitu, GF-704).
+        # Restart. Wait until the in-flight spans of the old epoch commit, then read
+        # the actual last hash (Postgres read-after-write after commit, GF-704).
         await_epoch_drain(run_id, last_epoch)
         prev_hash = fetch_last_hash(run_id)
         spawn_session(run_id, [epoch_id: last_epoch + 1, prev_hash: prev_hash] ++ opts)
     end
   end
 
-  # Repo reads — VÝHRADNĚ zde, nikdy v SessionGenServer (GF-751).
+  # Repo reads — EXCLUSIVELY here, never in SessionGenServer (GF-751).
   defp fetch_last_epoch(run_id) do
     Repo.one(from(l in Ledger, where: l.run_id == ^run_id, select: max(l.epoch_id)))
   end
@@ -84,27 +84,27 @@ defmodule SpanChain.Ingestion.SessionSupervisor do
     )
   end
 
-  # Čeká na flush in-flight batchů staré epochy. `{:epoch_flushed}` broadcastuje
-  # Pipeline.handle_batch po commitu. Symetrický un/subscribe (unsubscribe VŽDY voláno).
+  # Waits for the in-flight batches of the old epoch to flush. `{:epoch_flushed}` is broadcast
+  # by Pipeline.handle_batch after commit. Symmetric un/subscribe (unsubscribe is ALWAYS called).
   #
-  # GF-782: "drain until silence" — po PRVNÍM flush staré epochy drainuj dokud nepřijde
-  # `silence_ms` ticha. Burst > batch_size (50) = multiple batche in-flight; návrat po
-  # PRVNÍM flush (předchozí chování) nechal `fetch_last_hash` číst stale pozici → nová
-  # epocha se stale prev_hash → `verify_ledger` {:error, :chain_broken} (GF-666 regrese).
+  # GF-782: "drain until silence" — after the FIRST flush of the old epoch, drain until
+  # `silence_ms` of silence arrives. A burst > batch_size (50) = multiple batches in-flight; returning after
+  # the FIRST flush (the previous behavior) let `fetch_last_hash` read a stale position → a new
+  # epoch with a stale prev_hash → `verify_ledger` {:error, :chain_broken} (GF-666 regression).
   #
-  # Cold-start guard NEpotřeba: `await_epoch_drain/2` je voláno VÝHRADNĚ z `last_epoch`
-  # větve `recover_or_spawn/2`; `nil` větev (nový run) jde přímo na `spawn_session/2`.
+  # A cold-start guard is NOT needed: `await_epoch_drain/2` is called EXCLUSIVELY from the `last_epoch`
+  # branch of `recover_or_spawn/2`; the `nil` branch (new run) goes directly to `spawn_session/2`.
   defp await_epoch_drain(run_id, old_epoch) do
-    # GF-786: epoch_drain_timeout NENÍ config key — derivováno z aktuálního batch_timeout, takže
-    # se synchronizuje s `BATCH_FLUSH_TIMEOUT_MS` runtime overridem (GF-777). 10× + 200ms buffer
-    # zachová GF-780 invariant (drain > batch_timeout) i prod hodnotu 1_200ms (100*10+200; test
-    # 50*10+200=700ms). Timeout path: pokud Broadway commitne VŠE PŘED `subscribe` (rychlý
-    # Postgres), `receive` nedostane zprávu a vrátí :ok po timeout_ms → `fetch_last_hash` čte
-    # správná committed data (správné chování, jen latence; loguje warning níže).
+    # GF-786: epoch_drain_timeout is NOT a config key — it is derived from the current batch_timeout, so
+    # it stays in sync with the `BATCH_FLUSH_TIMEOUT_MS` runtime override (GF-777). 10× + 200ms buffer
+    # preserves the GF-780 invariant (drain > batch_timeout) and the prod value 1_200ms (100*10+200; test
+    # 50*10+200=700ms). Timeout path: if Broadway commits EVERYTHING BEFORE `subscribe` (a fast
+    # Postgres), `receive` gets no message and returns :ok after timeout_ms → `fetch_last_hash` reads
+    # the correct committed data (correct behavior, just latency; logs a warning below).
     batch_timeout = Application.get_env(:span_chain, :broadway_batch_timeout_ms, 100)
     timeout_ms = batch_timeout * 10 + 200
 
-    # GF-782: silence_ms MUSÍ být > batch_timeout (100ms prod po GF-777) — default 200ms = 2×.
+    # GF-782: silence_ms MUST be > batch_timeout (100ms prod after GF-777) — default 200ms = 2×.
     silence_ms = Application.get_env(:span_chain, :epoch_drain_silence_ms, 200)
     topic = "epoch_flush:#{run_id}"
     :ok = Phoenix.PubSub.subscribe(SpanChain.PubSub, topic)
@@ -115,8 +115,8 @@ defmodule SpanChain.Ingestion.SessionSupervisor do
     after
       timeout_ms ->
         Logger.warning(
-          "[SessionSupervisor] epoch drain timeout pro run_id=#{run_id}, epoch=#{old_epoch} — " <>
-            "předpokládáme missed broadcast, data by měla být committed"
+          "[SessionSupervisor] epoch drain timeout for run_id=#{run_id}, epoch=#{old_epoch} — " <>
+            "assuming a missed broadcast, data should be committed"
         )
 
         :ok
@@ -126,9 +126,9 @@ defmodule SpanChain.Ingestion.SessionSupervisor do
     :ok
   end
 
-  # Drainuje dokud nepřijde `silence_ms` ticha po POSLEDNÍ zprávě pro old_epoch. Každý
-  # další flush staré epochy resetuje silence okno; zprávy pro jiné epochy / run_ids se
-  # selektivním receivem ignorují (zůstanou v mailboxu — flush jiné session).
+  # Drains until `silence_ms` of silence arrives after the LAST message for old_epoch. Each
+  # further flush of the old epoch resets the silence window; messages for other epochs / run_ids are
+  # ignored by the selective receive (they stay in the mailbox — a flush of another session).
   defp drain_until_silence(run_id, old_epoch, silence_ms) do
     receive do
       {:epoch_flushed, ^run_id, ^old_epoch} ->

@@ -1,7 +1,7 @@
 defmodule SpanChain.Ingestion.SessionSupervisorTest do
-  # GF-775: ensure_session/1 nyní čte DB (fetch_last_epoch pro restart detekci),
-  # takže testy potřebují sandbox connection. DataCase (async: false → shared mode)
-  # propůjčí connection i Taskům v race testu i DynamicSupervisor-spawned SGS.
+  # GF-775: ensure_session/1 now reads the DB (fetch_last_epoch for restart detection),
+  # so the tests need a sandbox connection. DataCase (async: false → shared mode)
+  # lends the connection to the Tasks in the race test and the DynamicSupervisor-spawned SGS too.
   use SpanChain.DataCase, async: false
 
   alias SpanChain.Ingestion.SessionSupervisor

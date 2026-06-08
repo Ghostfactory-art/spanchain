@@ -1,5 +1,5 @@
 defmodule SpanChain.Ingestion.ValidationPlug do
-  @moduledoc "Sanitizuje run_id/agent_id na /ingest boundary — malformed identifikátory dostanou 400 dřív, než dorazí do SGS (GF-767)."
+  @moduledoc "Sanitizes run_id/agent_id at the /ingest boundary — malformed identifiers get a 400 before they reach the SGS (GF-767)."
 
   import Plug.Conn
 
@@ -7,10 +7,10 @@ defmodule SpanChain.Ingestion.ValidationPlug do
 
   def init(opts), do: opts
 
-  # Validace platí jen pro /ingest JSON boundary (čte body_params["run_id"]).
-  # /v1/traces nese run_id v resource attributes (NE v body_params), /health a
-  # forwardy (/evals, /cassettes) mají vlastní kontrakt — propouštíme beze změny.
-  # Stejný path-scoping vzor jako AuthPlug (request_path: "/health").
+  # Validation applies only to the /ingest JSON boundary (reads body_params["run_id"]).
+  # /v1/traces carries run_id in resource attributes (NOT in body_params), and /health and
+  # the forwards (/evals, /cassettes) have their own contract — we pass them through unchanged.
+  # Same path-scoping pattern as AuthPlug (request_path: "/health").
   def call(%Plug.Conn{request_path: "/ingest"} = conn, _opts) do
     if valid_id?(conn.body_params["run_id"], :required) and
          valid_id?(conn.body_params["agent_id"], :optional) do
@@ -23,18 +23,18 @@ defmodule SpanChain.Ingestion.ValidationPlug do
   def call(conn, _opts), do: conn
 
   @doc """
-  GF-774: veřejný run_id formát check pro /v1/traces (router.ex). /v1/traces obchází
-  `call/2` (path-scoped na /ingest), ale musí použít STEJNÝ kontrakt — deleguje na
-  `valid_id?/2` (`:required`), takže regex i nil/non-binary handling jsou single-source.
+  GF-774: public run_id format check for /v1/traces (router.ex). /v1/traces bypasses
+  `call/2` (path-scoped to /ingest), but must use the SAME contract — delegates to
+  `valid_id?/2` (`:required`), so the regex and nil/non-binary handling are single-source.
   """
   def valid_run_id?(run_id), do: valid_id?(run_id, :required)
 
-  # run_id povinné — chybějící i malformed → reject.
+  # run_id is required — both missing and malformed → reject.
   defp valid_id?(nil, :required), do: false
-  # agent_id volitelné — chybějící je OK (neměníme API kontrakt).
+  # agent_id is optional — missing is OK (we don't change the API contract).
   defp valid_id?(nil, :optional), do: true
   defp valid_id?(value, _req) when is_binary(value), do: Regex.match?(@valid_id_regex, value)
-  # Non-binary hodnota (číslo, mapa, list) regexu nikdy nevyhoví → reject.
+  # A non-binary value (number, map, list) never matches the regex → reject.
   defp valid_id?(_value, _req), do: false
 
   defp reject(conn) do

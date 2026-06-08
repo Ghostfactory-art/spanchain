@@ -2,14 +2,14 @@ defmodule SpanChain.PayloadSerializer do
   @moduledoc "Centralized payload serialization for Ledger and Harness."
 
   @doc """
-  Deterministická JSON serializace: klíče řazeny lexikograficky, rekurze
-  prochází vnořené mapy i mapy uvnitř polí. Použito pro hash-stable
-  reprezentaci payloadu v `Ledger.compute_hash/7` — Elixir mapy negarantují
-  pořadí klíčů (>32 klíčů přechází na HAMT), takže přímý `Jason.encode!`
-  by mohl produkovat různé stringy pro identická data.
+  Deterministic JSON serialization: keys sorted lexicographically, recursion
+  walks nested maps and maps inside lists. Used for the hash-stable
+  representation of the payload in `Ledger.compute_hash/7` — Elixir maps don't guarantee
+  key order (>32 keys switch to a HAMT), so a direct `Jason.encode!`
+  could produce different strings for identical data.
 
-  Past: `Map.new` po sortu pořadí klíčů okamžitě ztratí. Proto budujeme
-  JSON string ručně nad seřazeným seznamem 2-tuplů.
+  Pitfall: `Map.new` after sorting immediately loses the key order. So we build the
+  JSON string by hand over the sorted list of 2-tuples.
   """
   @spec canonical_encode(term()) :: String.t()
   def canonical_encode(data) when is_map(data) do
@@ -30,10 +30,10 @@ defmodule SpanChain.PayloadSerializer do
   def canonical_encode(data), do: Jason.encode!(data)
 
   @doc """
-  Normalizace jedné hodnoty pro `attributes` mapu: atomy se serializují
-  na stringy (`:ok` → `"ok"`), aby přežily JSON roundtrip beze ztráty.
-  `true`/`false`/`nil` zůstávají typové (JSON je má nativně). Stringy
-  a čísla projdou beze změny.
+  Normalize a single value for the `attributes` map: atoms are serialized
+  to strings (`:ok` → `"ok"`) so they survive the JSON roundtrip without loss.
+  `true`/`false`/`nil` stay typed (JSON has them natively). Strings
+  and numbers pass through unchanged.
   """
   @spec serialize_value(term()) :: term()
   def serialize_value(value) when is_atom(value) and not is_boolean(value) and not is_nil(value),

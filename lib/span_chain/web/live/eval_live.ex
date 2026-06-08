@@ -1,5 +1,5 @@
 defmodule SpanChain.Web.EvalLive do
-  @moduledoc "Side-by-side diff UI pro Eval — run selection + Comparator.compare/2 render (GF-707)."
+  @moduledoc "Side-by-side diff UI for an Eval — run selection + Comparator.compare/2 render (GF-707)."
 
   use Phoenix.LiveView
 
@@ -93,7 +93,7 @@ defmodule SpanChain.Web.EvalLive do
   def handle_event("compare", _params, socket), do: {:noreply, socket}
 
   # --------------------------------------------------------------------------
-  # Render — three views (pattern match na :view assign)
+  # Render — three views (pattern match on the :view assign)
   # --------------------------------------------------------------------------
 
   @impl true
@@ -154,8 +154,8 @@ defmodule SpanChain.Web.EvalLive do
       {length(@diff)} differences
     </p>
 
-    <%!-- GF-748: agent config diffs jako banner section (ne row v tabulce).
-          Root-cause kontext PŘED span tree diffs. --%>
+    <%!-- GF-748: agent config diffs as a banner section (not a table row).
+          Root-cause context BEFORE the span tree diffs. --%>
     <%= for d <- @diff, d["type"] == "config_diff" do %>
       <div class="config-diff-banner">
         <span class="label">⚙ Agent config diff</span>
@@ -259,7 +259,7 @@ defmodule SpanChain.Web.EvalLive do
     ~H|<span class="badge badge-other">{@label}</span>|
   end
 
-  # round(abs(b - a) / max(a, 1) * 100) — symmetrický s Comparator.significant_diff?
+  # round(abs(b - a) / max(a, 1) * 100) — symmetric with Comparator.significant_diff?
   defp diff_pct(a, b) when is_number(a) and is_number(b) do
     base = max(a, 1)
     round(abs(b - a) / base * 100)

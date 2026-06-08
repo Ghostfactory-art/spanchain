@@ -4,9 +4,9 @@ defmodule SpanChain.LedgerPropertyTest do
 
   alias SpanChain.Ledger
 
-  # In-memory chain builder — žádný DB call. Postaví validní hash-chain
-  # z libovolné sekvence payloadů; každý entry navazuje na předchozí přes
-  # prev_hash. Vrací list entry map (ne struct), shodné s `Ledger.build_entry/7`.
+  # In-memory chain builder — no DB call. Builds a valid hash chain
+  # from an arbitrary sequence of payloads; each entry chains onto the previous via
+  # prev_hash. Returns a list of entry maps (not structs), matching `Ledger.build_entry/7`.
   defp build_chain(payloads) do
     {entries, _last_hash} =
       Enum.reduce(payloads, {[], nil}, fn payload, {acc, prev_hash} ->
@@ -18,7 +18,7 @@ defmodule SpanChain.LedgerPropertyTest do
     entries
   end
 
-  property "Property D: tamper na libovolný payload zlomí hash na dané pozici" do
+  property "Property D: tampering with any payload breaks the hash at that position" do
     check all(
             payloads <-
               list_of(
@@ -52,7 +52,7 @@ defmodule SpanChain.LedgerPropertyTest do
     end
   end
 
-  property "Property D2: identický payload v identické pozici → identický hash (determinismus chainu)" do
+  property "Property D2: identical payload in an identical position → identical hash (chain determinism)" do
     check all(
             payloads <-
               list_of(
