@@ -1,13 +1,13 @@
-<!-- Source: architecture-map.md §3 — Datový tok (end-to-end flow) -->
+<!-- Source: architecture-map.md §3 — Data flow (end-to-end flow) -->
 
-## 3. Datový tok — end-to-end flow
+## 3. Data flow — end-to-end flow
 
 ```
 1.  HTTP POST /ingest         (Bandit, port 4000)
         │
 2.  Ingestion.AuthPlug.call/2 (auth_plug.ex:11-26)
         │  bearer header check, Plug.Crypto.secure_compare → fail-closed
-        │  /health bypass, jinak 401 + halt
+        │  /health bypass, otherwise 401 + halt
         │
 3.  Plug.Parsers JSON         (router.ex:12-15)
         │
@@ -22,8 +22,8 @@
         │  otherwise spawn_session/2 → DynamicSupervisor.start_child
         │  → SessionGenServer.init/1:
         │       state = %{run_id, eval_id, epoch_id: 0, seq: 0, prev_hash: nil}
-        │       (po GF-751/GF-746 + commit `9c7f03c`: ŽÁDNÝ DB přístup;
-        │        runs/evals upserty se přesunuly do Pipeline.handle_batch)
+        │       (after GF-751/GF-746 + commit `9c7f03c`: NO DB access;
+        │        runs/evals upserts moved into Pipeline.handle_batch)
         │
 7.  SessionGenServer.ingest_spans(run_id, spans)    (session_gen_server.ex:80-86)
         │  GenServer.call → mailbox FIFO → handle_call({:ingest_spans, spans})
@@ -31,8 +31,8 @@
 8.  build_entries/2          (session_gen_server.ex:138-149)
         │  Enum.reduce over spans:
         │    Ledger.build_entry/7 — compute_hash + entry map
-        │    append_span/2 přilepí state.eval_id na entry jako in-memory `:eval_id`
-        │       sidecar (GF-751; Pipeline strippne před Ledger.insert_batch)
+        │    append_span/2 attaches state.eval_id to the entry as an in-memory `:eval_id`
+        │       sidecar (GF-751; the Pipeline strips it before Ledger.insert_batch)
         │    state {prev_hash, seq, epoch_id} mutated
         │    maybe_epoch_boundary (seq % 1000 == 0 → epoch_id++, seq=0, prev_hash kept GF-666)
         │
@@ -55,7 +55,7 @@
         │
 13. Pipeline.handle_batch(:default, messages, _, _)  (pipeline.ex:72-130)
         │  entries = Enum.map(messages, & &1.data)
-        │  (GF-751/GF-746 metadata fáze — PŘED ledger insert, defensive rescue):
+        │  (GF-751/GF-746 metadata phase — BEFORE the ledger insert, defensive rescue):
         │    ensure_run_records(entries)     # Repo.insert_all "runs"  on_conflict :nothing
         │    ensure_eval_records(entries)    # Repo.insert_all "evals" + COALESCE update runs.eval_id
         │    upsert_agent_configs(entries)   # GF-748 gf.agent.* projection
@@ -65,7 +65,7 @@
         │    on raise → catch → {:error, reason} → retry up to 3× exp backoff (500/1000/2000 ms prod, 1ms test)
         │
 14a. Success path
-        │  broadcast_flushed/1 (pipeline.ex:114-119) — VOLÁNO POSLEDNÍ (po metadata + ledger commit)
+        │  broadcast_flushed/1 (pipeline.ex:114-119) — CALLED LAST (after metadata + ledger commit)
         │    Phoenix.PubSub.broadcast → "run:#{run_id}" → {:spans_flushed, run_id}
         │    Phoenix.PubSub.broadcast → "runs"         → {:run_updated,  run_id}
         │  TrailLive.handle_info/2 re-fetches view (trail_live.ex:64-78)
@@ -79,7 +79,7 @@
         │  hash chain in Ledger continues with gaps → verify_ledger detects
 ```
 
-ASCII zkrácená verze (jako v prompt task):
+Shortened ASCII version (as in the prompt task):
 
 ```
 HTTP POST /ingest
@@ -91,7 +91,7 @@ HTTP POST /ingest
   → SessionGenServer.handle_call({:ingest_spans, spans})
       → build_entries → Ledger.compute_hash per span
       → BufferProducer.enqueue (cast, async)
-  → vrátí 202 + {accepted, run_id}
+  → returns 202 + {accepted, run_id}
         ─── ASYNC ───
   → BufferProducer (GenStage demand) → Broadway Pipeline
       → handle_batch → with_retry/3 → Repo.transaction → Ledger.insert_batch/1
@@ -99,10 +99,10 @@ HTTP POST /ingest
           └─ fail → Message.failed → handle_failed → DeadLetter.store/3
 ```
 
-OTLP/HTTP JSON cesta (`POST /v1/traces`) má identický downstream — pouze
-prepend krok `OtlpTranslator.translate/1` (`router.ex:82-105`) převede
-`resourceSpans` JSON na interní span shape + extrahuje `run_id` z
-`service.instance.id` + `eval_id` z `gf.eval_id` resource attribute.
+The OTLP/HTTP JSON path (`POST /v1/traces`) has an identical downstream — it only
+prepends the step `OtlpTranslator.translate/1` (`router.ex:82-105`), which converts
+the `resourceSpans` JSON into the internal span shape + extracts `run_id` from
+`service.instance.id` + `eval_id` from the `gf.eval_id` resource attribute.
 
 ---
 

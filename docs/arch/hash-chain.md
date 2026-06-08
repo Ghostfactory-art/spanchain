@@ -1,23 +1,23 @@
 <!-- Source: architecture-map.md §5 — Hash-chain invariant -->
 
-## 5. Hash-chain invariant — jak funguje a proč
+## 5. Hash-chain invariant — how it works and why
 
-### Co je hash-chain
+### What a hash-chain is
 
-Každý záznam v `ledger_entries` má sloupce:
+Each record in `ledger_entries` has the columns:
 
-- `seq` — pořadové číslo uvnitř epochy (0..999)
-- `epoch_id` — pořadové číslo epochy (0, 1, 2, ...)
-- `prev_hash` — hash předchozího záznamu (NULL pro úplně první)
-- `hash` — SHA256 hex tohoto záznamu
-- `event_type` — string discriminator („llm_call", „tool_call", ...)
-- `parent_span_id` — pro stromovou hierarchii spans
-- `payload` — opaque JSON mapa s celým spanem
-- + projection columns `span_id`, `trace_id`, `started_at`, `ended_at`, `status` (GF-669/GF-653/GF-790, **NEJSOU** v hashi)
+- `seq` — sequence number within the epoch (0..999)
+- `epoch_id` — epoch sequence number (0, 1, 2, ...)
+- `prev_hash` — hash of the previous record (NULL for the very first)
+- `hash` — SHA256 hex of this record
+- `event_type` — string discriminator ("llm_call", "tool_call", ...)
+- `parent_span_id` — for the span tree hierarchy
+- `payload` — an opaque JSON map with the whole span
+- + projection columns `span_id`, `trace_id`, `started_at`, `ended_at`, `status` (GF-669/GF-653/GF-790, **NOT** in the hash)
 
-### Co vstupuje do hashe
+### What goes into the hash
 
-Z `compute_hash/7` v `ledger.ex` (post GF-787):
+From `compute_hash/7` in `ledger.ex` (post GF-787):
 
 ```elixir
 data =
@@ -26,35 +26,35 @@ data =
 :crypto.hash(:sha256, data) |> Base.encode16(case: :lower)
 ```
 
-Pořadí: `seq`, `prev_hash`, `event_type`, `canonical_encode(payload)`,
-`parent_span_id`, `run_id`, `epoch_id`. **Sedm polí**, separator `:`. `nil` se hashuje
-jako literál `"nil"` — záměrně, aby NULL byl deterministický. Integer pole (`seq`,
-`epoch_id`) jdou do stringu přes explicitní `Integer.to_string/1` (GF-812 — v
-kryptografickém kódu musí být každá konverze záměrná, ne delegovaná na `String.Chars`
-protocol dispatch; výstup je bit-for-bit identický, pinned regression test v `ledger_test.exs`).
+Order: `seq`, `prev_hash`, `event_type`, `canonical_encode(payload)`,
+`parent_span_id`, `run_id`, `epoch_id`. **Seven fields**, separator `:`. `nil` is hashed
+as the literal `"nil"` — deliberately, so NULL is deterministic. The integer fields (`seq`,
+`epoch_id`) go into the string via an explicit `Integer.to_string/1` (GF-812 — in
+cryptographic code every conversion must be deliberate, not delegated to `String.Chars`
+protocol dispatch; the output is bit-for-bit identical, pinned regression test in `ledger_test.exs`).
 
-**`run_id` + `epoch_id` JSOU v hashi (GF-787)** — entry je tak kryptograficky vázána
-ke svému runu/epoše, ne jen SQL filtrem ve `verify_ledger` (`where run_id == ^x`). Dřív
-(5 polí, pre-GF-787) šlo entry potichu přesunout pod jiný `run_id`/`epoch_id` v DB bez
-detekce; teď to rozbije chain. **Rozsah (poctivě):** zavírá naivní SQL relabel/přesun;
-hash zůstává *unkeyed* → útočník s DB write + recompute pořád zfalšuje čistý řetěz a
-truncation ocasu je neviditelná (keyed/HMAC + externí anchoring = budoucí práce).
+**`run_id` + `epoch_id` ARE in the hash (GF-787)** — an entry is thus cryptographically bound
+to its run/epoch, not just by the SQL filter in `verify_ledger` (`where run_id == ^x`). Before
+(5 fields, pre-GF-787) an entry could be silently moved under a different `run_id`/`epoch_id` in the DB without
+detection; now that breaks the chain. **Scope (honestly):** it closes naive SQL relabel/move;
+the hash stays *unkeyed* → an attacker with DB write + recompute can still forge a clean chain and
+tail truncation is invisible (keyed/HMAC + external anchoring = future work).
 
-### Proč `canonical_encode`
+### Why `canonical_encode`
 
-`payload_serializer.ex:14-24`: Elixir mapy s >32 klíči přechází na HAMT
-reprezentaci, která NEGARANTUJE pořadí klíčů při iteraci. `Jason.encode!(map)`
-proto může pro identická data vrátit různé JSON stringy podle insertion
-order. To by způsobilo false `{:error, :chain_broken}` u runů s velkými
-payloady. `canonical_encode` rekurzivně serializuje s lex-sortem klíčů
-přímo nad seznamem 2-tuplů — pořadí klíčů deterministicky stabilní.
-GF-654 zavedeno právě kvůli tomuto. Past, kterou prompt zmiňuje: `Map.new`
-po sortu pořadí klíčů okamžitě ZTRATÍ (mapa znovu hashuje klíče) — proto
-build JSON stringu ručně.
+`payload_serializer.ex:14-24`: Elixir maps with >32 keys switch to a HAMT
+representation that does NOT GUARANTEE key order on iteration. `Jason.encode!(map)`
+can therefore return different JSON strings for identical data depending on insertion
+order. That would cause a false `{:error, :chain_broken}` on runs with large
+payloads. `canonical_encode` serializes recursively with a lexical sort of keys
+directly over a list of 2-tuples — key order is deterministically stable.
+GF-654 was introduced exactly for this. The pitfall the prompt mentions: `Map.new`
+after the sort immediately LOSES the key order (the map re-hashes the keys) — so we
+build the JSON string by hand.
 
-### `verify_ledger/1` — co dělá
+### `verify_ledger/1` — what it does
 
-Z `ledger.ex:181-205`:
+From `ledger.ex:181-205`:
 
 ```elixir
 entries = (from l in Ledger, where l.run_id == ^run_id, order_by [asc: :epoch_id, asc: :seq])
@@ -68,20 +68,20 @@ Enum.reduce_while(entries, {:ok, 0, nil}, fn e, {:ok, count, last_hash} ->
 end)
 ```
 
-Funkce recomputuje hash každého řádku a porovnává:
-1. **Tamper**: `expected != e.hash` — někdo přepsal `payload`/`event_type`/`parent_span_id` v DB ale nepřepočítal `hash`. SHA256 to odhalí.
-2. **Gap**: `e.prev_hash != last_hash` — chybí řádek uprostřed (dead-letter / DELETE). Záznam `n+1` má `prev_hash = hash(n)`, ale v reduce už jsme přeskočili `n`, takže `last_hash` neodpovídá.
+The function recomputes the hash of each row and compares:
+1. **Tamper**: `expected != e.hash` — someone overwrote `payload`/`event_type`/`parent_span_id` in the DB but didn't recompute `hash`. SHA256 detects it.
+2. **Gap**: `e.prev_hash != last_hash` — a row is missing in the middle (dead-letter / DELETE). Record `n+1` has `prev_hash = hash(n)`, but in the reduce we already skipped `n`, so `last_hash` doesn't match.
 
-### Kdy `{:error, :chain_broken}` v praxi
+### When `{:error, :chain_broken}` happens in practice
 
-| Situace | Důvod chain_broken |
+| Situation | Reason for chain_broken |
 |---|---|
-| **Dead-letter** | Batch po 3 retries selhal → `DeadLetter.store/3` → row neexistuje v Ledger. Hash chain pokračuje (SGS i tak inkrementoval `seq`/`prev_hash`), ale gap detekován. Záměrný audit signál „data exists, but not in authoritative source." (`dead_letter.ex:1-15` › „není součástí hash-chainu... `verify_ledger` selže — to je záměrné") |
-| **Tamper** | Manuální `Repo.update_all` na payload/parent_span_id sloupec. Smoke test ukázán v development.md:81-91. |
-| **Race v Pipeline retry** | Pokud retry úspěšný ale duplicitní insert → uniq index `(run_id, epoch_id, seq)` → idempotent skip. NE chain_broken — `on_conflict: :nothing` v `ledger.ex:148-150`. |
-| **Epoch Island Attack** | Někdo smaže celou epochu (např. `epoch_id = 5` všechny řádky). První řádek epochy 6 má `prev_hash = hash(last_row_of_epoch_5)`, ale `last_hash` v reduce je `hash(last_row_of_epoch_4)`. → `chain_broken`. **TOTO JE PŘESNĚ TO, CO GF-666 PŘIDAL.** |
+| **Dead-letter** | A batch failed after 3 retries → `DeadLetter.store/3` → the row doesn't exist in the Ledger. The hash chain continues (the SGS incremented `seq`/`prev_hash` anyway), but the gap is detected. A deliberate audit signal "data exists, but not in authoritative source." (`dead_letter.ex:1-15` › "not part of the hash-chain... `verify_ledger` fails — that is intentional") |
+| **Tamper** | A manual `Repo.update_all` on the payload/parent_span_id column. Smoke test shown in development.md:81-91. |
+| **Race in Pipeline retry** | If a retry succeeds but the insert is duplicate → the unique index `(run_id, epoch_id, seq)` → idempotent skip. NOT chain_broken — `on_conflict: :nothing` in `ledger.ex:148-150`. |
+| **Epoch Island Attack** | Someone deletes a whole epoch (e.g. all rows for `epoch_id = 5`). The first row of epoch 6 has `prev_hash = hash(last_row_of_epoch_5)`, but `last_hash` in the reduce is `hash(last_row_of_epoch_4)`. → `chain_broken`. **THIS IS EXACTLY WHAT GF-666 ADDED.** |
 
-### Epoch boundary — proč existuje a co je „Epoch Island Attack"
+### Epoch boundary — why it exists and what the "Epoch Island Attack" is
 
 `session_gen_server.ex:175-186`:
 
@@ -92,22 +92,22 @@ defp maybe_epoch_boundary(%{seq: seq} = state) when seq > 0 and rem(seq, @epoch_
 end
 ```
 
-Každých `@epoch_size = 1_000` spans (`session_gen_server.ex:41`) se epocha
-rolluje: `epoch_id++`, `seq=0`. Důvod: index na `(run_id, epoch_id, seq)` má
-omezený prostor — bez epoch by `seq` rostlo do nekonečna a operace nad chainem
-(verify, range queries) by lineárně zpomalovaly s délkou runu.
+Every `@epoch_size = 1_000` spans (`session_gen_server.ex:41`) the epoch
+rolls over: `epoch_id++`, `seq=0`. Reason: the index on `(run_id, epoch_id, seq)` has
+a bounded space — without epochs `seq` would grow without bound and operations over the chain
+(verify, range queries) would slow down linearly with the length of the run.
 
-**Klíčový GF-666 fix**: `prev_hash: state.prev_hash` — hash POSLEDNÍHO záznamu
-předchozí epochy se ZACHOVÁ jako `prev_hash` PRVNÍHO záznamu nové epochy.
-Bez toho by každá epocha začínala `prev_hash = nil` a verify_ledger by byl
-imunní vůči smazání celé epochy (pre-GF-666 bug: „Epoch Island Attack" —
-adversary smaže `epoch_id = N`, epocha N+1 začíná nil-prev_hash, vypadá to
-jako legitimní start, integrity check pass).
+**Key GF-666 fix**: `prev_hash: state.prev_hash` — the hash of the LAST record
+of the previous epoch is PRESERVED as the `prev_hash` of the FIRST record of the new epoch.
+Without it, each epoch would start with `prev_hash = nil` and verify_ledger would be
+blind to the deletion of a whole epoch (pre-GF-666 bug: "Epoch Island Attack" —
+an adversary deletes `epoch_id = N`, epoch N+1 starts with a nil-prev_hash, it looks
+like a legitimate start, the integrity check passes).
 
-Pre-GF-666: `verify_ledger` resetoval `last_hash` na epoch boundary
-→ ostrov nedetekovaný. Post-GF-666: `last_hash` se přenáší napříč epochami
-v reduce loop (`ledger.ex:190-199`) → `entry.prev_hash != last_hash` u
-prvního záznamu epochy N+1 → `{:error, :chain_broken}`. ✅
+Pre-GF-666: `verify_ledger` reset `last_hash` at the epoch boundary
+→ the island went undetected. Post-GF-666: `last_hash` carries across epochs
+in the reduce loop (`ledger.ex:190-199`) → `entry.prev_hash != last_hash` at the
+first record of epoch N+1 → `{:error, :chain_broken}`. ✅
 
 ---
 

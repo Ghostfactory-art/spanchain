@@ -275,7 +275,7 @@ These were tracked tradeoffs that have since been fixed. Kept here as a paper tr
 - **Postgres (GF-704) + concurrency unlocked (GF-779).** Repo runs on Postgres (`postgrex`); the
   former SQLite single-writer `concurrency: 1` is lifted — processors `System.schedulers_online()`,
   batcher `concurrency: 4` + `partition_by: :erlang.phash2(run_id)` (per-session serialization,
-  cross-session parallelism on MVCC; producer stays 1). `with_retry/3` = Scénář B (blanket retry,
+  cross-session parallelism on MVCC; producer stays 1). `with_retry/3` = Scenario B (blanket retry,
   covers Postgres transients). First Postgres baseline: `docs/stress-test-results-2026-05-27.md`.
 - **OTLP run_id validation (GF-774).** `/v1/traces` validates `run_id` (from `service.instance.id`)
   with the same regex as `/ingest` via `ValidationPlug.valid_run_id?/1` → 400 `invalid_id_format`
@@ -283,32 +283,32 @@ These were tracked tradeoffs that have since been fixed. Kept here as a paper tr
 
 ### Resolved this session
 
-- ✅ **GF-702** (commit `1bb49eb`): `:persistent_term` → `Agent` v negative test stubs.
+- ✅ **GF-702** (commit `1bb49eb`): `:persistent_term` → `Agent` in negative test stubs.
 - ✅ **GF-705** (commit `3e904d1`): Broadway sandbox contamination fix — `router_test`
-  + `session_gen_server_test` čekají na flush před koncem testu (telemetry barrier).
-  Pozdější Sprint 4 cleanup (`edc8c02`, `ed450b2`) převedl telemetry na
-  post-commit PubSub po GF-703 změně, viz CLAUDE.md L#94.
-- ✅ **GF-649** (commit `ab4c763`): OTLP/HTTP JSON endpoint `/v1/traces`. Protobuf
-  variant zůstává L3.
-- ✅ **GF-706** (commit `0fd366d`): Eval Framework backend — `evals` tabulka +
-  `Comparator` + `/evals/*` HTTP API. Pasivní associace přes OTLP
+  + `session_gen_server_test` wait for the flush before the test ends (telemetry barrier).
+  A later Sprint 4 cleanup (`edc8c02`, `ed450b2`) switched the telemetry to
+  post-commit PubSub after the GF-703 change, see CLAUDE.md L#94.
+- ✅ **GF-649** (commit `ab4c763`): OTLP/HTTP JSON endpoint `/v1/traces`. The Protobuf
+  variant stays L3.
+- ✅ **GF-706** (commit `0fd366d`): Eval Framework backend — `evals` table +
+  `Comparator` + `/evals/*` HTTP API. Passive association via the OTLP
   `resource.attributes["gf.eval_id"]`.
 - ✅ **GF-703** (commit `6306083`): PubSub broadcast vs DB visibility — Option A
-  (`Repo.transaction` wrap kolem `Ledger.insert_batch`). Broadcast až po commitu;
-  WAL readery vidí data v okamžiku doručení broadcastu.
+  (`Repo.transaction` wrap around `Ledger.insert_batch`). Broadcast only after commit;
+  WAL readers see the data at the moment the broadcast is delivered.
 - ✅ **GF-712** (commit `eefc177`): Debug Replay Cassette backend — schema +
-  context + pure Replayer + sub-router `/cassettes/*`. Replay přes normální
-  SGS→Pipeline→Ledger; hash chain invariant zachován.
+  context + pure Replayer + sub-router `/cassettes/*`. Replay via the normal
+  SGS→Pipeline→Ledger; the hash chain invariant is preserved.
 - ✅ **GF-672** (commit `75f7870`): `rest_for_one` sub-supervisor
-  `PipelineSupervisor` obaluje `[BufferRegistry, Pipeline]`. Registry crash
-  nyní správně cascade restart Pipeline → Broadway respawn BufferProducer →
-  re-register `:singleton`. Scope shift od prompt-uvedeného wrap
-  `[BufferProducer, Pipeline]` (ten by recreate GF-667 double-instance bug).
-  Viz nová sekce "Supervision tree" níže.
-- ✅ **GF-707** (commit `d9935a2`): `SpanChain.Web.EvalLive` LiveView na
-  `/eval/:eval_id` — side-by-side diff UI nad `Evals.Comparator.compare/2`.
-  První konzument Comparator z UI vrstvy (do teď jen JSON přes
-  `GET /evals/:eval_id/compare`). Viz nová sekce "Eval UI" níže.
+  `PipelineSupervisor` wraps `[BufferRegistry, Pipeline]`. A Registry crash
+  now correctly cascade-restarts Pipeline → Broadway respawns BufferProducer →
+  re-registers `:singleton`. A scope shift from the prompt-listed wrap
+  `[BufferProducer, Pipeline]` (which would recreate the GF-667 double-instance bug).
+  See the new "Supervision tree" section below.
+- ✅ **GF-707** (commit `d9935a2`): `SpanChain.Web.EvalLive` LiveView at
+  `/eval/:eval_id` — side-by-side diff UI over `Evals.Comparator.compare/2`.
+  The first consumer of Comparator from the UI layer (until now only JSON via
+  `GET /evals/:eval_id/compare`). See the new "Eval UI" section below.
 
 ---
 
@@ -318,10 +318,10 @@ Ingestion is asynchronous — `SessionGenServer` responds to HTTP immediately
 (hash computation only), the DB write runs through a Broadway pipeline on the
 side.
 
-> **Architektura** (producer/consumer model, pipeline flow diagram, `rest_for_one`,
-> concurrency GF-779, retry sémantika) → viz
-> [`docs/arch/broadway-pipeline.md`](arch/broadway-pipeline.md). Níže jen dev/ops:
-> config keys, `.env` loading, runtime introspekce.
+> **Architecture** (producer/consumer model, pipeline flow diagram, `rest_for_one`,
+> concurrency GF-779, retry semantics) → see
+> [`docs/arch/broadway-pipeline.md`](arch/broadway-pipeline.md). Below, only dev/ops:
+> config keys, `.env` loading, runtime introspection.
 
 Config keys (`config/config.exs` defaults):
 
@@ -367,82 +367,82 @@ move to Postgres in L3, processors concurrency can grow with
 
 ## Supervision tree — dev ops
 
-> **Architektura** (kompletní strom, per-node rationale, `PipelineSupervisor`
-> `rest_for_one`/GF-672, OTP mentální model) → viz
-> [`docs/arch/supervision-and-otp.md`](arch/supervision-and-otp.md). Níže jen
-> operační smoke testy + známý edge case.
+> **Architecture** (complete tree, per-node rationale, `PipelineSupervisor`
+> `rest_for_one`/GF-672, OTP mental model) → see
+> [`docs/arch/supervision-and-otp.md`](arch/supervision-and-otp.md). Below, only
+> operational smoke tests + a known edge case.
 
 ### Smoke test — supervision tree
 
 ```elixir
 iex> Supervisor.which_children(SpanChain.Supervisor)
-# zde uvidíš PipelineSupervisor jako child (ne BufferRegistry + Pipeline samostatně)
+# here you'll see PipelineSupervisor as a child (not BufferRegistry + Pipeline separately)
 
 iex> Supervisor.which_children(SpanChain.Ingestion.PipelineSupervisor)
 # → [{Registry, _, :supervisor, _}, {SpanChain.Ingestion.Pipeline, _, :supervisor, _}]
 
-# Ověř re-registration po Pipeline crash (Broadway respawn producer):
+# Verify re-registration after a Pipeline crash (Broadway respawns the producer):
 iex> [{old_producer, _}] = Registry.lookup(SpanChain.Ingestion.BufferRegistry, :singleton)
 iex> pipeline = Process.whereis(SpanChain.Ingestion.Pipeline)
 iex> Process.exit(pipeline, :kill)
 iex> :timer.sleep(200)
 iex> [{new_producer, _}] = Registry.lookup(SpanChain.Ingestion.BufferRegistry, :singleton)
-iex> new_producer != old_producer   # → true ✅ fresh BufferProducer re-registrl
+iex> new_producer != old_producer   # → true ✅ a fresh BufferProducer re-registered
 ```
 
-Pozor: NE kill přímo na `BufferRegistry` supervisor — viz "Known edge case
-(GF-724)" níže. Pipeline crash je čistý demo `rest_for_one` mechanismu bez
-ETS race; demonstruje že Broadway-interni BufferProducer.init/1 se po
-restart correctly re-registruje v stále živé Registry.
+Caution: do NOT kill the `BufferRegistry` supervisor directly — see "Known edge case
+(GF-724)" below. A Pipeline crash is a clean demo of the `rest_for_one` mechanism without an
+ETS race; it shows that the Broadway-internal BufferProducer.init/1 correctly re-registers
+in the still-alive Registry after the restart.
 
 ### Known edge case (GF-724 — Working as Intended)
 
-`Process.exit(reg, :kill)` na celý `BufferRegistry` supervisor způsobí pád
-aplikace. Příčina: BEAM asynchronně uvolňuje ETS jména partition procesů
-po killu. `rest_for_one` spustí restart ihned — ale jména ještě nejsou
-volná → `name already taken` → 3 okamžitá selhání → `max_restarts: 3`
-vyčerpán → `PipelineSupervisor` padá → cascade do root supervisoru →
+`Process.exit(reg, :kill)` on the whole `BufferRegistry` supervisor crashes the
+application. Cause: the BEAM asynchronously frees the ETS names of the partition processes
+after a kill. `rest_for_one` starts the restart immediately — but the names aren't
+free yet → `name already taken` → 3 immediate failures → `max_restarts: 3`
+exhausted → `PipelineSupervisor` falls → cascade to the root supervisor →
 `Application exited: shutdown`.
 
-Toto je BEAM expected behavior při `:kill` signálu na supervisor (fail-fast
-princip). V produkci `Registry` jako celek nespadne — individual partitions
-crashují izolovaně a self-restartují uvnitř Registry supervisoru bez
-externího zásahu.
+This is BEAM expected behavior on a `:kill` signal to a supervisor (the fail-fast
+principle). In production the `Registry` as a whole doesn't fall — individual partitions
+crash in isolation and self-restart inside the Registry supervisor without
+external intervention.
 
-`:kill` na Registry supervisor je syntetický test, ne realistický produkční
-failure mode. Diagnóza potvrzena Gemini + Grok review 2026-05-18 (s
-nesouhlasem: Gemini uzavřel jako WaI, Grok doporučil fix pro L3). L3
-followup: **GF-729** (BufferRegistry permanent supervisor výše v
-hierarchii).
+A `:kill` on the Registry supervisor is a synthetic test, not a realistic production
+failure mode. Diagnosis confirmed by a Gemini + Grok review 2026-05-18 (with
+disagreement: Gemini closed it as WaI, Grok recommended a fix for L3). L3
+followup: **GF-729** (BufferRegistry permanent supervisor higher in the
+hierarchy).
 
 ---
 
 ## Eval Framework (`/evals/*`)
 
-`Eval` je zastřešující agregát pro porovnávání více `runs` se stejným záměrem
-("stejná otázka, 3 různé modely"). Klient generuje `eval_id` a posílá ho jako
-OTLP `resource.attributes["gf.eval_id"]`; backend pasivně upsertuje associaci
-v `SessionGenServer.init/1`. Backend **neorchestruje** spuštění agentů.
+`Eval` is an umbrella aggregate for comparing multiple `runs` with the same intent
+("same question, 3 different models"). The client generates `eval_id` and sends it as the
+OTLP `resource.attributes["gf.eval_id"]`; the backend passively upserts the association
+in `SessionGenServer.init/1`. The backend does **not orchestrate** running the agents.
 
 ### HTTP API
 
 ```
-POST   /evals                              # vytvoří Eval
-GET    /evals/:eval_id                     # detail s run_count + run_ids
-GET    /evals/:eval_id/compare?run_a&run_b # strukturální + duration diff
+POST   /evals                              # creates an Eval
+GET    /evals/:eval_id                     # detail with run_count + run_ids
+GET    /evals/:eval_id/compare?run_a&run_b # structural + duration diff
 ```
 
-Auth: `Authorization: Bearer <token>` (AuthPlug platí přes `forward "/evals"`).
+Auth: `Authorization: Bearer <token>` (AuthPlug applies via `forward "/evals"`).
 
 ```bash
-# Vytvořit Eval
+# Create an Eval
 curl -X POST http://localhost:4000/evals \
   -H "Authorization: Bearer dev-secret-change-me" \
   -H "Content-Type: application/json" \
   -d '{"eval_id":"eval-llm-v1","name":"LLM comparison"}'
 # → 201 {"eval_id":"eval-llm-v1","name":"LLM comparison","status":"running","created_at":"..."}
 
-# Run pod evalem (OTLP s gf.eval_id attribute)
+# Run under the eval (OTLP with the gf.eval_id attribute)
 curl -X POST http://localhost:4000/v1/traces \
   -H "Authorization: Bearer dev-secret-change-me" \
   -H "Content-Type: application/json" \
@@ -451,7 +451,7 @@ curl -X POST http://localhost:4000/v1/traces \
        {"key":"gf.eval_id","value":{"stringValue":"eval-llm-v1"}}
     ]},"scopeSpans":[{"spans":[...]}]}]}'
 
-# Compare dvou runů
+# Compare two runs
 curl "http://localhost:4000/evals/eval-llm-v1/compare?run_a=run-a&run_b=run-b" \
   -H "Authorization: Bearer dev-secret-change-me"
 # → 200 {"summary":{...},"differences":[{"span_name":...,"type":"duration_diff"|"span_added"|"span_removed","deviation_point":true},...]}
@@ -459,50 +459,50 @@ curl "http://localhost:4000/evals/eval-llm-v1/compare?run_a=run-a&run_b=run-b" \
 
 ### Comparator semantics
 
-`SpanChain.Evals.Comparator` je pure tree diff (žádný GenServer, žádný stav):
+`SpanChain.Evals.Comparator` is a pure tree diff (no GenServer, no state):
 
-- Stromy spans sestaveny z `parent_span_id` hierarchie (stejný algoritmus
-  jako `TrailLive.build_tree`)
-- Children páruje podle `name` + sibling pozice (i-tý "llm_call" v A se matchuje
-  s i-tým v B)
-- Diff typy:
-  - `span_added` — uzel v B který nemá pár v A
-  - `span_removed` — uzel v A bez páru v B
-  - `duration_diff` — spárované uzly s >20% rozdílem v `duration_ms`
-- `deviation_point: true` — první emitovaný diff per top-level branch
-- `{:error, :different_eval}` — pokud oba runs mají non-nil `eval_id` a liší se
-- `{:error, :run_not_found}` — chybějící Run řádek
+- Span trees are built from the `parent_span_id` hierarchy (same algorithm
+  as `TrailLive.build_tree`)
+- Children are paired by `name` + sibling position (the i-th "llm_call" in A matches
+  the i-th in B)
+- Diff types:
+  - `span_added` — a node in B with no pair in A
+  - `span_removed` — a node in A with no pair in B
+  - `duration_diff` — paired nodes with a >20% difference in `duration_ms`
+- `deviation_point: true` — the first emitted diff per top-level branch
+- `{:error, :different_eval}` — if both runs have a non-nil `eval_id` and they differ
+- `{:error, :run_not_found}` — a missing Run row
 
 ### Architecture
 
-→ viz [`docs/arch/eval-and-replay.md`](arch/eval-and-replay.md) (Eval Framework,
-`Comparator` pure tree diff, pasivní asociace `eval_id` přes SGS sidecar →
-Pipeline metadata fáze, `duration_ms` payload-first).
+→ see [`docs/arch/eval-and-replay.md`](arch/eval-and-replay.md) (Eval Framework,
+`Comparator` pure tree diff, passive association of `eval_id` via the SGS sidecar →
+Pipeline metadata phase, `duration_ms` payload-first).
 
 ---
 
 ## Eval UI (`/eval/:eval_id`)
 
-`SpanChain.Web.EvalLive` (GF-707) je první konzument
-`Evals.Comparator.compare/2` z UI vrstvy. Read-only, one-shot load —
-žádný PubSub subscribe, žádný real-time refresh (na rozdíl od TrailLive).
-URL query params jsou source of truth, takže view je linkable.
+`SpanChain.Web.EvalLive` (GF-707) is the first consumer of
+`Evals.Comparator.compare/2` from the UI layer. Read-only, one-shot load —
+no PubSub subscribe, no real-time refresh (unlike TrailLive).
+The URL query params are the source of truth, so the view is linkable.
 
 **Route:** `http://localhost:4001/eval/:eval_id` (Phoenix Endpoint port
-4001 — stejný jako `/trail`).
+4001 — same as `/trail`).
 
-### Tři views (pattern match na `:view` socket assign)
+### Three views (pattern match on the `:view` socket assign)
 
-| `:view`   | Kdy                                                    | Co se renderuje                              |
+| `:view`   | When                                                   | What is rendered                             |
 |-----------|--------------------------------------------------------|----------------------------------------------|
-| `:select` | `eval_id` resolved, žádné `run_a`/`run_b` query params | Dva `<select>` dropdowny + Compare submit    |
-| `:diff`   | `run_a` + `run_b` v params, Comparator `{:ok, _}`      | Summary + diff table (nebo "Identical runs") |
-| `:error`  | Eval neexistuje, `:run_not_found`, `:different_eval`   | Error message + Back link                    |
+| `:select` | `eval_id` resolved, no `run_a`/`run_b` query params    | Two `<select>` dropdowns + Compare submit    |
+| `:diff`   | `run_a` + `run_b` in params, Comparator `{:ok, _}`     | Summary + diff table (or "Identical runs")   |
+| `:error`  | Eval doesn't exist, `:run_not_found`, `:different_eval`| Error message + Back link                    |
 
-### Asociace `run` ↔ `eval`
+### Association `run` ↔ `eval`
 
-EvalLive nezakládá runs — to dělá ingest cesta. Aby se run přiřadil k evalu,
-klient v OTLP requestu nastaví `resource.attributes["gf.eval_id"]`:
+EvalLive does not create runs — the ingest path does. To attach a run to an eval,
+the client sets `resource.attributes["gf.eval_id"]` in the OTLP request:
 
 ```bash
 curl -X POST http://localhost:4000/v1/traces \
@@ -516,26 +516,26 @@ curl -X POST http://localhost:4000/v1/traces \
        "endTimeUnixNano":"1716000000100000000","attributes":[]}]}]}]}'
 ```
 
-Backend pasivně upsertuje `%Eval{}` + nastaví `runs.eval_id` v SGS init
-(viz Eval Framework sekce). Pak je run dohledatelný v `eval.runs` a
-EvalLive `:select` view ho nabídne v dropdownu.
+The backend passively upserts `%Eval{}` + sets `runs.eval_id` in SGS init
+(see the Eval Framework section). The run is then findable in `eval.runs` and
+the EvalLive `:select` view offers it in the dropdown.
 
 ### Smoke test — Eval UI (IEx variant)
 
-Pro rychlý UI test bez ingest cesty (přímo Repo + Ledger):
+For a quick UI test without the ingest path (directly via Repo + Ledger):
 
 ```elixir
 # 1. Start: iex -S mix phx.server
 iex> alias SpanChain.{Eval, Run, Repo, Ledger}
 
-# 2. Vytvoř eval + dva runs
+# 2. Create an eval + two runs
 iex> eval_id = "eval-demo-1"
 iex> Repo.insert!(%Eval{eval_id: eval_id, status: "running", name: "Demo"})
 iex> Repo.insert!(%Run{run_id: "run-fast", status: "completed", eval_id: eval_id})
 iex> Repo.insert!(%Run{run_id: "run-slow", status: "completed", eval_id: eval_id})
 
-# 3. Vlož spans s ms-precision started_at/ended_at v payloadu (kvuli
-#    sub-second duration_ms — GF-669 projekce truncuje na :second)
+# 3. Insert spans with ms-precision started_at/ended_at in the payload (because of
+#    sub-second duration_ms — the GF-669 projection truncates to :second)
 iex> mkspan = fn run_id, name, ms ->
 ...>   base = ~U[2026-05-18 10:00:00.000Z]
 ...>   payload = %{
@@ -551,56 +551,56 @@ iex> Ledger.insert_batch([mkspan.("run-slow", "llm_call", 500)])
 
 **Browser checkpoints:**
 
-| URL                                                                            | Co uvidíš                                                      |
+| URL                                                                            | What you'll see                                                |
 |--------------------------------------------------------------------------------|----------------------------------------------------------------|
-| `http://localhost:4001/eval/eval-demo-1`                                        | `:select` view — dva dropdowny, `run-fast`/`run-slow`           |
+| `http://localhost:4001/eval/eval-demo-1`                                        | `:select` view — two dropdowns, `run-fast`/`run-slow`           |
 | `http://localhost:4001/eval/eval-demo-1?run_a=run-fast&run_b=run-slow`          | `:diff` view — 100ms vs 500ms, **400% Δ**, ⚠ deviation marker  |
 | `http://localhost:4001/eval/eval-demo-1?run_a=run-fast&run_b=run-fast`          | "✓ Identical runs — no differences detected"                    |
 | `http://localhost:4001/eval/does-not-exist`                                     | `:error` view, "Eval not found"                                 |
 
 ### Architecture
 
-- Comparator volán **přímo** (`alias SpanChain.Evals.Comparator`), ne
-  přes `GET /evals/:id/compare` HTTP — jsme ve stejné OTP aplikaci, HTTP
-  hop by byl zbytečný.
-- `handle_event("compare", ...)` → `push_patch` na `/eval/:id?run_a=X&run_b=Y`
-  → `handle_params/3` re-fires Comparator. URL state je single source of
-  truth; refresh stránky vrátí identický view.
-- `deviation_point` post-GF-740 (Sprint 7) označuje **první diff entry v každé
-  top-level větvi** span stromu (ne globální index 0 jako pre-fix). UI
-  vykresluje ⚠ marker per větev — agent s 5 souběžnými tool calls a 2
-  divergentními větvemi zobrazí 2 deviation markers, ne 1. Implementace:
-  `diff_trees/2` flat_mapuje per top-level pair s per-branch
+- Comparator is called **directly** (`alias SpanChain.Evals.Comparator`), not
+  via `GET /evals/:id/compare` HTTP — we're in the same OTP application, an HTTP
+  hop would be pointless.
+- `handle_event("compare", ...)` → `push_patch` to `/eval/:id?run_a=X&run_b=Y`
+  → `handle_params/3` re-fires Comparator. The URL state is the single source of
+  truth; a page refresh returns an identical view.
+- `deviation_point` post-GF-740 (Sprint 7) marks the **first diff entry in each
+  top-level branch** of the span tree (not the global index 0 as pre-fix). The UI
+  renders a ⚠ marker per branch — an agent with 5 concurrent tool calls and 2
+  divergent branches shows 2 deviation markers, not 1. Implementation:
+  `diff_trees/2` flat_maps per top-level pair with per-branch
   `mark_deviation_points`.
-- Žádný JavaScript, žádný `live_component` — čistý LiveView sigil.
+- No JavaScript, no `live_component` — a pure LiveView sigil.
 
 ---
 
 ## Cassettes (`/cassettes/*`)
 
-Cassette je DB-backed snapshot payload streamu pro daný `run_id`, replayovatelný
-přes normální `SessionGenServer → Pipeline → Ledger` cestu. **Žádný bypass
-hash-chainu** — replay produkuje samostatný validní chain pod novým `run_id`,
-porovnatelný se zdrojem přes `Evals.Comparator`.
+A Cassette is a DB-backed snapshot of the payload stream for a given `run_id`, replayable
+via the normal `SessionGenServer → Pipeline → Ledger` path. **No hash-chain
+bypass** — replay produces a separate valid chain under a new `run_id`,
+comparable to the source via `Evals.Comparator`.
 
 Use cases:
-1. **Regression testing** — "nezměnil se span strom agenta po update modelu?"
-2. **Replay pod Eval** — cassette jako `run_b` v `Evals.Comparator.compare`
-3. **Offline debugging** — bez API calls, bez kreditu
+1. **Regression testing** — "did the agent's span tree change after a model update?"
+2. **Replay under an Eval** — a cassette as `run_b` in `Evals.Comparator.compare`
+3. **Offline debugging** — no API calls, no credit
 
 ### HTTP API
 
 ```
-POST   /cassettes/record           # snapshot existujícího run_id do cassety
+POST   /cassettes/record           # snapshot an existing run_id into a cassette
 GET    /cassettes/:cassette_id     # detail + spans
 GET    /cassettes                  # metadata list (DESC by recorded_at)
-POST   /cassettes/:cassette_id/replay   # replay pod novým run_id
+POST   /cassettes/:cassette_id/replay   # replay under a new run_id
 ```
 
-Auth: `Authorization: Bearer <token>` (AuthPlug platí přes `forward "/cassettes"`).
+Auth: `Authorization: Bearer <token>` (AuthPlug applies via `forward "/cassettes"`).
 
 ```bash
-# 1. Nahraj run
+# 1. Ingest a run
 curl -X POST http://localhost:4000/ingest \
   -H "Authorization: Bearer dev-secret-change-me" \
   -H "Content-Type: application/json" \
@@ -623,118 +623,118 @@ curl -X POST http://localhost:4000/cassettes/cas-001/replay \
 # → 200 {"run_id":"replay-cas-001-...","span_count":1,"hash_valid":true,"diff":[]}
 ```
 
-Response invariant: `hash_valid` je `true` iff `Ledger.verify_ledger(new_run_id)`
-vrátil `{:ok, _}` (chain validní); `false` znamená chain corrupted (nikdy by se
-nemělo stát pro identický replay). `diff` je výstup `Evals.Comparator.compare`
-mezi zdrojovým a replayovaným `run_id` (struktura `[%{"span_name", "type", ...}]`,
-`[]` pro identický replay).
+Response invariant: `hash_valid` is `true` iff `Ledger.verify_ledger(new_run_id)`
+returned `{:ok, _}` (chain valid); `false` means the chain is corrupted (should never
+happen for an identical replay). `diff` is the output of `Evals.Comparator.compare`
+between the source and the replayed `run_id` (structure `[%{"span_name", "type", ...}]`,
+`[]` for an identical replay).
 
 ### Replayer semantics
 
-`SpanChain.Cassettes.Replayer` je **pure modul** (žádný GenServer, žádný
-`spawn_link`). `replay/2` běží v caller procesu (HTTP request, test process):
+`SpanChain.Cassettes.Replayer` is a **pure module** (no GenServer, no
+`spawn_link`). `replay/2` runs in the caller process (HTTP request, test process):
 
-1. Subscribe na `"run:#{new_run_id}"` topic
+1. Subscribe to the `"run:#{new_run_id}"` topic
 2. `SessionSupervisor.ensure_session(new_run_id)` + `SessionGenServer.ingest_spans`
-3. **Multi-batch wait**: receive loop na `{:spans_flushed, ^run_id}` broadcastů +
-   `Repo.aggregate` count check dokud DB count ≥ expected. Cassette s N spans
-   emituje `ceil(N / batch_size)` broadcastů (batch_size default 50) → replay
-   nesmí vrátit po prvním, musí čekat na všechny.
+3. **Multi-batch wait**: receive loop on `{:spans_flushed, ^run_id}` broadcasts +
+   `Repo.aggregate` count check until DB count ≥ expected. A cassette with N spans
+   emits `ceil(N / batch_size)` broadcasts (batch_size default 50) → the replay
+   must not return after the first, it must wait for all.
 4. `Ledger.verify_ledger(new_run_id)` + `Evals.Comparator.compare(source, new_run_id)`
-5. `Phoenix.PubSub.unsubscribe` v `after` bloku (i při timeout / raise)
+5. `Phoenix.PubSub.unsubscribe` in the `after` block (even on timeout / raise)
 
-Klíčový invariant: post-GF-703 broadcast firi **AŽ PO** `Repo.transaction`
-commit a connection release. Receive loop má tedy garanci že po každém broadcastu
-jsou rows viditelné a Broadway connection je zpět v poolu — žádný sandbox race.
+Key invariant: post-GF-703 the broadcast fires **only AFTER** the `Repo.transaction`
+commit and connection release. The receive loop therefore has a guarantee that after each broadcast
+the rows are visible and the Broadway connection is back in the pool — no sandbox race.
 
 ### Architecture
 
-→ viz [`docs/arch/eval-and-replay.md`](arch/eval-and-replay.md) (pure replay engine
-`receive` loop, payload-first snapshot, pasivní asociace na Evals, subscribe-order
+→ see [`docs/arch/eval-and-replay.md`](arch/eval-and-replay.md) (pure replay engine
+`receive` loop, payload-first snapshot, passive association with Evals, subscribe-order
 invariant / `Registry.unregister/2`).
 
-### Async replay přes `/api` (GF-798/803)
+### Async replay via `/api` (GF-798/803)
 
-Výše uvedený `POST /cassettes/:id/replay` (port 4000, `Cassettes.Router`) je
-**synchronní** (200/408, 15s self-bound) a zůstává beze změny. Pro React UI byl
-přidán **asynchronní** variant na `/api` scope (port 4001, `Web.ApiController`):
+The `POST /cassettes/:id/replay` above (port 4000, `Cassettes.Router`) is
+**synchronous** (200/408, 15s self-bound) and stays unchanged. For the React UI an
+**asynchronous** variant was added on the `/api` scope (port 4001, `Web.ApiController`):
 
 ```bash
-# 1. Enqueue — vrátí 202 okamžitě (Bandit nedrží konexi)
+# 1. Enqueue — returns 202 immediately (Bandit doesn't hold the connection)
 curl -X POST http://localhost:4001/api/cassettes/cas-001/replay \
   -H "Authorization: Bearer dev-secret-change-me"
 # → 202 {"job_id":"<uuid>","status":"running"}
 
-# 2. Poll dokud status != "running"
+# 2. Poll until status != "running"
 curl http://localhost:4001/api/cassettes/replay_jobs/<job_id> \
   -H "Authorization: Bearer dev-secret-change-me"
 # → {"id":"<uuid>","status":"completed","result":{"run_id":...,"span_count":...,"hash_valid":true,"diff":[]}}
-#   (nebo {"status":"failed","result":{"error":"..."}})
+#   (or {"status":"failed","result":{"error":"..."}})
 ```
 
-- `Cassettes.enqueue_replay/2` vloží `ReplayJob` (`replay_jobs` tabulka, uuid PK,
-  jsonb `result`) se `status: "running"` a spustí `run_replay_job` přes
+- `Cassettes.enqueue_replay/2` inserts a `ReplayJob` (`replay_jobs` table, uuid PK,
+  jsonb `result`) with `status: "running"` and starts `run_replay_job` via
   `Task.Supervisor.start_child(SpanChain.TaskSupervisor, …)` (fire-and-forget).
-  `run_replay_job` volá stejný `Cassettes.replay` (tedy `Replayer.replay`) v task
-  procesu → `{:ok}`→`completed`, `{:error}`/rescue→`failed`. `Replayer` beze změny.
-- Frontend: `useReplay` hook (`assets/src/hooks/useReplay.js`, GF-803) je polling
-  state machine — POST → poll `replay_jobs/:id` každých 1.5s rekurzivním
-  `setTimeout` (40 pokusů ≈ 60s timeout guard), `running`→`completed`/`failed`.
-- Omezení v1: `try/rescue` nezachytí `:EXIT` (externally killed task) → job zůstane
-  `"running"`; budoucí periodický sweep à la GF-788.
+  `run_replay_job` calls the same `Cassettes.replay` (i.e. `Replayer.replay`) in the task
+  process → `{:ok}`→`completed`, `{:error}`/rescue→`failed`. `Replayer` is unchanged.
+- Frontend: the `useReplay` hook (`assets/src/hooks/useReplay.js`, GF-803) is a polling
+  state machine — POST → poll `replay_jobs/:id` every 1.5s via a recursive
+  `setTimeout` (40 attempts ≈ 60s timeout guard), `running`→`completed`/`failed`.
+- v1 limitation: `try/rescue` doesn't catch `:EXIT` (externally killed task) → the job stays
+  `"running"`; a future periodic sweep à la GF-788.
 
 ### Cassette Workflow
 
-Quick-reference end-to-end (detaily viz sekce výše).
+Quick-reference end-to-end (details in the sections above).
 
 **Create cassette (snapshot run):**
 `POST /cassettes/record` (port 4000, `Cassettes.Router`)
 Required: `run_id` (string), `cassette_id` (string, user-defined)
 Optional: `name` (string)
 Response 201: `{cassette_id, run_id, name, span_count, recorded_at}`
-Error 404: `"run has no ledger rows"` — run neexistuje nebo nemá ledger data
+Error 404: `"run has no ledger rows"` — the run doesn't exist or has no ledger data
 
 **List cassettes:**
 `GET /api/cassettes` (port 4001)
 Response: `{offset, total, limit, cassettes: [...]}`
-(cassette objekty: `id`, `run_id`, `name`, `recorded_at`, `inserted_at` — metadata-only, **bez** `span_count`/`snapshot`, aby velký list netáhl celé payloady)
+(cassette objects: `id`, `run_id`, `name`, `recorded_at`, `inserted_at` — metadata-only, **without** `span_count`/`snapshot`, so a large list doesn't drag whole payloads)
 
 **Replay cassette (async, GF-798):**
 `POST /api/cassettes/:cassette_id/replay` (port 4001)
 Response 202: `{job_id, status}`
-Poll: `GET /api/cassettes/replay_jobs/:id` → `{id, status, result}` (`result` = `{run_id, span_count, hash_valid, diff}` po `completed`)
-(Sync varianta: `POST /cassettes/:cassette_id/replay` na portu 4000 → 200 `{run_id, span_count, hash_valid, diff}`)
+Poll: `GET /api/cassettes/replay_jobs/:id` → `{id, status, result}` (`result` = `{run_id, span_count, hash_valid, diff}` after `completed`)
+(Sync variant: `POST /cassettes/:cassette_id/replay` on port 4000 → 200 `{run_id, span_count, hash_valid, diff}`)
 
-Pozn.: `Cassettes.Router` (port 4000) je Plug sub-router forwardovaný z `Ingestion.Router` (record + sync replay).
-`ApiController` cassette actions (port 4001) jsou pro management React UI (list, async replay, job polling).
+Note: `Cassettes.Router` (port 4000) is a Plug sub-router forwarded from `Ingestion.Router` (record + sync replay).
+The `ApiController` cassette actions (port 4001) are for the React management UI (list, async replay, job polling).
 
 ---
 
 ## OTLP/HTTP JSON endpoint `/v1/traces`
 
-GhostFactory přijímá OpenTelemetry-native `OTLP/HTTP JSON` na portu 4000 vedle
-vlastního `/ingest` formátu. Žádný Protobuf, žádná nová mix dep — `Plug.Parsers`
-JSON stačí. OTLP/HTTP JSON je plnohodnotná součást OTel specifikace.
+GhostFactory accepts OpenTelemetry-native `OTLP/HTTP JSON` on port 4000 alongside
+its own `/ingest` format. No Protobuf, no new mix dep — `Plug.Parsers`
+JSON is enough. OTLP/HTTP JSON is a full part of the OTel specification.
 
 **Endpoint:** `POST /v1/traces` (`Plug.Router`, port 4000)
-**Auth:** `Authorization: Bearer <token>` přes `AuthPlug` (stejný jako `/ingest`)
-**Response:** `200` + `{"partialSuccess": {"rejectedSpans": 0}}` (OTLP spec — ne 202)
+**Auth:** `Authorization: Bearer <token>` via `AuthPlug` (same as `/ingest`)
+**Response:** `200` + `{"partialSuccess": {"rejectedSpans": 0}}` (OTLP spec — not 202)
 
-**Translation rules** (v `lib/.../ingestion/otlp_translator.ex`):
+**Translation rules** (in `lib/.../ingestion/otlp_translator.ex`):
 
-- `run_id` ← `resource.attributes["service.instance.id"]` (chybí → `400`)
+- `run_id` ← `resource.attributes["service.instance.id"]` (missing → `400`)
 - `traceId` / `spanId` / `parentSpanId` — hex string passthrough
-- `startTimeUnixNano` / `endTimeUnixNano` (string ns) → ISO 8601 UTC s microsecond
-  precision (Elixir `DateTime` neumí nanosekundy; ns truncated na μs — L2 acceptable)
-- Atributy: KeyValue list → flat `%{key => value}` map; podpora `stringValue`,
-  `intValue`, `boolValue`. `doubleValue`, `arrayValue`, `kvlistValue` + neznámá
-  pole (`kind`, `status`, `events`, `links`, `traceState`, ...) tiše ignorovány.
-- Více `resourceSpans` v jednom requestu — seskupení podle `run_id` (`Enum.each`
-  → `SessionGenServer.ingest_spans/2` per skupina)
+- `startTimeUnixNano` / `endTimeUnixNano` (string ns) → ISO 8601 UTC with microsecond
+  precision (Elixir `DateTime` can't do nanoseconds; ns truncated to μs — L2 acceptable)
+- Attributes: KeyValue list → flat `%{key => value}` map; supports `stringValue`,
+  `intValue`, `boolValue`. `doubleValue`, `arrayValue`, `kvlistValue` + unknown
+  fields (`kind`, `status`, `events`, `links`, `traceState`, ...) silently ignored.
+- Multiple `resourceSpans` in one request — grouped by `run_id` (`Enum.each`
+  → `SessionGenServer.ingest_spans/2` per group)
 
-**Architecture:** Hexagonal — `OtlpTranslator` je hloupý adaptér na HTTP boundary.
-Downstream (SGS → BufferProducer → Pipeline → Ledger, hash chain) **netknut**.
-Stejná cesta jako `/ingest`, jen jiný vstupní shape.
+**Architecture:** Hexagonal — `OtlpTranslator` is a dumb adapter at the HTTP boundary.
+The downstream (SGS → BufferProducer → Pipeline → Ledger, hash chain) is **untouched**.
+Same path as `/ingest`, just a different input shape.
 
 **Smoke test:**
 
@@ -745,22 +745,22 @@ curl -X POST http://localhost:4000/v1/traces \
   -d '{"resourceSpans":[{"resource":{"attributes":[{"key":"service.instance.id","value":{"stringValue":"otlp-test"}}]},"scopeSpans":[{"spans":[{"traceId":"abc","spanId":"def","name":"llm_call","startTimeUnixNano":"1716000000000000000","endTimeUnixNano":"1716000001000000000","attributes":[]}]}]}]}'
 
 # → 200 {"partialSuccess":{"rejectedSpans":0}}
-# → GET http://localhost:4001/trail/otlp-test viditelný v Trail UI
+# → GET http://localhost:4001/trail/otlp-test visible in the Trail UI
 ```
 
 ---
 
 ## PubSub broadcast
 
-Pipeline broadcastuje po každém úspěšném `Ledger.insert_batch` přes `Phoenix.PubSub`.
-Broadcast je defenzivní (try/rescue/catch) — Pipeline nikdy nepadne kvůli PubSub výpadku.
+The Pipeline broadcasts after every successful `Ledger.insert_batch` via `Phoenix.PubSub`.
+The broadcast is defensive (try/rescue/catch) — the Pipeline never falls due to a PubSub outage.
 
 Topics:
 - `"run:#{run_id}"` → `{:spans_flushed, run_id}` — detail view
 - `"runs"` → `{:run_updated, run_id}` — index view
 
-`TrailLive` subscribuje v `handle_params/3` (ne `mount/3`) — `connected?(socket)` guard.
-`maybe_resubscribe/2` unsubscribuje starý topic při navigaci mezi run_ids.
+`TrailLive` subscribes in `handle_params/3` (not `mount/3`) — `connected?(socket)` guard.
+`maybe_resubscribe/2` unsubscribes the old topic when navigating between run_ids.
 
 ---
 
@@ -770,11 +770,11 @@ Separate Python package in `../ghostfactory-sdk/` (sibling of `gf_experiment/`).
 Uses `httpx` async + `contextvars.ContextVar` for per-task isolation. **Never**
 `threading.local` (would share state across coroutines).
 
-Post-GF-741 (Sprint 7): exporter posílá **OTLP/HTTP JSON na `/v1/traces`**
-(parita s TS SDK), ne legacy `{run_id, spans: [...]}` formát. Mapping
-`span.run_id` → `resource.attributes["service.instance.id"]` (kanonický
-OTel klíč; backend `OtlpTranslator.extract_run_id/1` čte výhradně tento).
-Veřejné API (`gf.init`/`@gf.trace`/`gf.span`) beze změny.
+Post-GF-741 (Sprint 7): the exporter sends **OTLP/HTTP JSON to `/v1/traces`**
+(parity with the TS SDK), not the legacy `{run_id, spans: [...]}` format. Mapping
+`span.run_id` → `resource.attributes["service.instance.id"]` (the canonical
+OTel key; the backend `OtlpTranslator.extract_run_id/1` reads only this one).
+The public API (`gf.init`/`@gf.trace`/`gf.span`) is unchanged.
 
 Install + test (Python 3.11+):
 
@@ -855,7 +855,7 @@ const result = await gf.span("agent_run", { model: "claude-sonnet-4-6" }, async 
   gf.span("nested", {}, async () => "ok")
 );
 await gf.flush();
-// → http://localhost:4001/trail/ts-smoke-1 zobrazí 2 spans s nested parent_span_id
+// → http://localhost:4001/trail/ts-smoke-1 shows 2 spans with a nested parent_span_id
 ```
 
 For SDK usage examples (`attrs`, token tracking, agent config versioning,
@@ -867,7 +867,7 @@ SDK never raises to the caller — send-path failures are silent
 (`process.env.GF_DEBUG=1` for debug output). Spans buffered (50 / 5 s); call
 `await gf.flush()` for explicit drain before process exit.
 
-**vs Python SDK** (Sprint 8 parity snapshot — kontrakt detail v
+**vs Python SDK** (Sprint 8 parity snapshot — contract detail in
 [`docs/arch/sdk-contract.md`](arch/sdk-contract.md)):
 
 | Concern | Python SDK | TypeScript SDK |
@@ -876,9 +876,9 @@ SDK never raises to the caller — send-path failures are silent
 | Payload | `{resourceSpans: [...]}` | `{resourceSpans: [...]}` |
 | `run_id` attribute | `service.instance.id` | `service.instance.id` |
 | Send model | per-span on context exit | buffered 50 / 5 s + `flush()` |
-| Eval ID | `set_eval_id` / `eval_scope` per-task isolated (GF-727 / GF-744) | `evalScope` per-task isolated via `AsyncLocalStorage` (GF-733) — parita s Python |
-| Attribute typy | int/bool/float dispatch (GF-742) | int/bool/float dispatch (GF-742) |
-| Token / agent / reasoning / task attrs | `attrs` module — `gen_ai.*` + `gf.usage.*` + `gf.agent.*` + `gf.reasoning.*` + `gf.task.*` + `hash_prompt` (GF-735 / GF-738 / GF-736 / GF-737) | `attrs` namespace — same constants + `hashPrompt` (cross-language string-value parita testem) |
+| Eval ID | `set_eval_id` / `eval_scope` per-task isolated (GF-727 / GF-744) | `evalScope` per-task isolated via `AsyncLocalStorage` (GF-733) — parity with Python |
+| Attribute types | int/bool/float dispatch (GF-742) | int/bool/float dispatch (GF-742) |
+| Token / agent / reasoning / task attrs | `attrs` module — `gen_ai.*` + `gf.usage.*` + `gf.agent.*` + `gf.reasoning.*` + `gf.task.*` + `hash_prompt` (GF-735 / GF-738 / GF-736 / GF-737) | `attrs` namespace — same constants + `hashPrompt` (cross-language string-value parity by test) |
 | Context | `contextvars.ContextVar` | `AsyncLocalStorage` |
 | Span IDs | `secrets.token_hex(8)` | `randomBytes(8).toString('hex')` |
 | Trace IDs | n/a (single span per request) | `randomBytes(16).toString('hex')` per root |
@@ -940,7 +940,7 @@ the built bundle from `priv/static/`; there is no separate production frontend s
   **`GET /api/evals/:id/compare?run_a&run_b`** (GF-793 — `summary` + `differences`),
   `/api/cassettes`, **`POST /api/cassettes/:id/replay` (async, GF-798 — 202 + `job_id`)** +
   **`GET /api/cassettes/replay_jobs/:id`** (poll). `useReplay` (GF-803) is the polling state machine
-  consuming these (see the *Async replay přes `/api`* section above).
+  consuming these (see the *Async replay via `/api`* section above).
 - **Span tree hierarchy:** the Dossier `SpanTree` builds depth from each span's `span_id`
   and `parent_span_id` (GF-793 exposes `span_id` in the run-detail response), so the tree
   reflects real parent→child nesting rather than a flat list. **GF-797:** when no span has a

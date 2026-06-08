@@ -169,6 +169,6 @@ The boundary is intentional: `:telemetry` measures GhostFactory; the Ledger meas
 
 ## References
 
-- Linear: [ADR-001 — Architektonická rozhodnutí a vrstvový model](https://linear.app/gf-aos/document/adr-001-architektonicka-rozhodnuti-a-vrstvovy-model-85ee2435485f)
+- Linear: [ADR-001 — Architecture decisions and the layered model](https://linear.app/gf-aos/document/adr-001-architektonicka-rozhodnuti-a-vrstvovy-model-85ee2435485f)
 - Code: `lib/gf_experiment/ledger.ex`, `lib/gf_experiment/ingestion/session_gen_server.ex`
 - Related docs: `docs/payload-schemas.md`, `docs/development.md`

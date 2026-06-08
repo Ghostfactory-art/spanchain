@@ -1,110 +1,110 @@
-<!-- Source: architecture-map.md §10 — Open otázky + known gaps -->
+<!-- Source: architecture-map.md §10 — Open questions + known gaps -->
 
-## 10. Open otázky a known limitations
+## 10. Open questions and known limitations
 
-Z `docs/development.md:206-214` (sekce „Open L2 limitations") + dodatečně:
+From `docs/development.md:206-214` (the "Open L2 limitations" section) + additions:
 
 ### GF-733 (tracked): TS SDK `setEvalId` module-level
-`ghostfactory-ts-sdk/src/client.ts` ukládá eval_id do module-level config,
-ne do `AsyncLocalStorage`. Pro single-run script bez problému; pro paralelní
-`Promise.all` runs kde každý task volá `setEvalId(...)` nezávisle dochází k
-last-writer-wins race condition. Python SDK má stejné API přes `ContextVar`
-(GF-727 / GF-744) a je per-task izolovaný. Fix: přesunout do
-`AsyncLocalStorage` po vzoru `_currentSpanId`. Tracked, ne-blocking pro L2
-(eval_id přes `gf.init({ evalId })` per-run je jednodušší cesta).
+`ghostfactory-ts-sdk/src/client.ts` stores eval_id in module-level config,
+not in `AsyncLocalStorage`. Fine for a single-run script; for parallel
+`Promise.all` runs where each task calls `setEvalId(...)` independently there's a
+last-writer-wins race condition. The Python SDK has the same API via `ContextVar`
+(GF-727 / GF-744) and is per-task isolated. Fix: move to
+`AsyncLocalStorage` following the `_currentSpanId` pattern. Tracked, non-blocking for L2
+(eval_id via `gf.init({ evalId })` per-run is the simpler route).
 
-### Buffer není persistentní
-`BufferProducer` je in-memory `:queue.queue()` (`buffer_producer.ex:73`).
-Crash celého BEAM procesu → ztráta entries které opustily SGS ale ještě
-nedoběhly Broadway batch. Žádný recovery — SDK má vlastní buffer (Python
-deque/1000, TS in-memory list) ale jen pro send-path failures, ne pro
+### The buffer is not persistent
+`BufferProducer` is an in-memory `:queue.queue()` (`buffer_producer.ex:73`).
+A crash of the whole BEAM process → loss of entries that left the SGS but hadn't yet
+made it through a Broadway batch. No recovery — the SDK has its own buffer (Python
+deque/1000, TS in-memory list) but only for send-path failures, not for a
 backend crash. L3: persistent queue (NATS JetStream, GF-648/GF-650).
 
 ### Postgres throughput baseline (GF-704 + GF-779)
 `Pipeline batchers: concurrency: 4 + partition_by run_id` (`pipeline.ex`).
-Dev-box Docker Postgres: ~6k spans/s (100×100), >4k spans/s i při 1000 sessions
-(viz `docs/stress-test-results-2026-05-27.md`). Nižší než SQLite in-process baseline
-(Docker/TCP overhead) + low-volume latence vyšší (partition_by trickle tradeoff) —
-hodnota = cross-session souběžnost + produkční Postgres cesta, ne dev-box spans/s.
+Dev-box Docker Postgres: ~6k spans/s (100×100), >4k spans/s even at 1000 sessions
+(see `docs/stress-test-results-2026-05-27.md`). Lower than the SQLite in-process baseline
+(Docker/TCP overhead) + higher low-volume latency (partition_by trickle tradeoff) —
+the value = cross-session concurrency + the production Postgres path, not dev-box spans/s.
 
-### GF-704 (L3): Revize `with_retry` při přechodu na Postgres
-Aktuálně `Ledger.Behaviour.insert_batch/1` (`ledger_behaviour.ex:14`) vrací
-raw `{n, nil | [...]}` tuple — selhání signalizováno přes `raise` (Ecto
-driver konvence). `Pipeline.with_retry/3` catchuje raise → `{:error, _}` →
-retry. Postgres driver má jiné failure modes (deadlock, connection lost) —
-možná by tagged-tuple `{:ok, n} | {:error, reason}` callback byl vhodnější
-jakmile nepoužíváme raise pro chyby.
+### GF-704 (L3): Revisit `with_retry` after the move to Postgres
+Currently `Ledger.Behaviour.insert_batch/1` (`ledger_behaviour.ex:14`) returns
+a raw `{n, nil | [...]}` tuple — failure signaled via `raise` (Ecto
+driver convention). `Pipeline.with_retry/3` catches the raise → `{:error, _}` →
+retry. The Postgres driver has different failure modes (deadlock, connection lost) —
+a tagged-tuple `{:ok, n} | {:error, reason}` callback might be more suitable
+once we no longer use raise for errors.
 
-### GF-729 (L3): BufferRegistry permanent supervisor výše v hierarchii
-Edge case GF-724 (`development.md:362-380`): `Process.exit` na celý
-BufferRegistry supervisor způsobí ETS name race během rest_for_one restart
-→ root supervisor padá. Working as Intended pro `:kill` signál (BEAM
-fail-fast), ale L3 by mohl Registry povýšit do root supervisoru aby crash
-neměl cascade efekt na PipelineSupervisor. Diagnóza potvrzena 2026-05-18
+### GF-729 (L3): BufferRegistry permanent supervisor higher in the hierarchy
+Edge case GF-724 (`development.md:362-380`): `Process.exit` on the whole
+BufferRegistry supervisor causes an ETS name race during the rest_for_one restart
+→ the root supervisor falls. Working as Intended for the `:kill` signal (BEAM
+fail-fast), but L3 could promote the Registry into the root supervisor so a crash
+has no cascade effect on PipelineSupervisor. Diagnosis confirmed 2026-05-18
 (Gemini + Grok review).
 
-### Pre-GF-703 telemetry race (rezolvovaný, kept jako paper trail)
-Telemetry `[:gf, :ledger, :batch_insert, :stop]` firil UVNITŘ
-`Repo.transaction`, takže LiveView/Replayer probuzeni před commit visibility
-→ `Repo.all` občas vrátil stale data + Sandbox `owner exited` error v
-testech. Fix: `safe_broadcast/1` PO `Repo.transaction` return (`pipeline.ex:80-91`).
-Telemetry stop event zůstal kvůli kompatibilitě (uvnitř transakce stále),
-ale produkční signál pro „can read now" je PubSub broadcast.
+### Pre-GF-703 telemetry race (resolved, kept as a paper trail)
+The telemetry `[:gf, :ledger, :batch_insert, :stop]` fired INSIDE
+`Repo.transaction`, so LiveView/Replayer were woken before commit visibility
+→ `Repo.all` sometimes returned stale data + a Sandbox `owner exited` error in
+tests. Fix: `safe_broadcast/1` AFTER the `Repo.transaction` return (`pipeline.ex:80-91`).
+The telemetry stop event stayed for compatibility (still inside the transaction),
+but the production signal for "can read now" is the PubSub broadcast.
 
 ### `Cassettes.Replayer` runtime ownership
-Replayer běží v caller procesu (HTTP request, Task.Supervisor task, nebo test
-process), ne v dedicated GenServer. Důvod: PubSub subscription + cleanup tied
-to caller lifecycle. Trade-off: dlouhotrvající replay (>15 s default timeout)
-bloku caller thread.
+The Replayer runs in the caller process (HTTP request, Task.Supervisor task, or test
+process), not in a dedicated GenServer. Reason: the PubSub subscription + cleanup are tied
+to the caller lifecycle. Trade-off: a long-running replay (>15 s default timeout)
+blocks the caller thread.
 
-**GF-798 (implementováno):** předpovězený „dedicated job + job-id polling" model
-je teď live pro `/api` scope — `POST /api/cassettes/:id/replay` enqueue-ne
-`ReplayJob` (`replay_jobs` tabulka) a spustí Replayer ve `Task.Supervisor`
-(`SpanChain.TaskSupervisor`) tasku → HTTP request se NEblokuje (vrátí 202 +
-`job_id` okamžitě), frontend polluje `GET /api/cassettes/replay_jobs/:id`. Ne
-GenServer (jak naivně předpovězeno) — `Task.Supervisor` + Ecto stav stačí, Replayer
-zůstal beze změny (jen běží v task procesu). Port-4000 `Cassettes.Router` replay
-zůstává synchronní (HTTP request je caller, 15s self-bound). Omezení v1: `try/rescue`
-nezachytí `:EXIT` (killed task) → job zůstane "running"; budoucí sweep à la GF-788.
+**GF-798 (implemented):** the predicted "dedicated job + job-id polling" model
+is now live for the `/api` scope — `POST /api/cassettes/:id/replay` enqueues a
+`ReplayJob` (`replay_jobs` table) and runs the Replayer in a `Task.Supervisor`
+(`SpanChain.TaskSupervisor`) task → the HTTP request does NOT block (returns 202 +
+`job_id` immediately), the frontend polls `GET /api/cassettes/replay_jobs/:id`. Not a
+GenServer (as naively predicted) — `Task.Supervisor` + Ecto state is enough, the Replayer
+is unchanged (it just runs in a task process). The port-4000 `Cassettes.Router` replay
+stays synchronous (the HTTP request is the caller, 15s self-bound). v1 limitation: `try/rescue`
+doesn't catch `:EXIT` (killed task) → the job stays "running"; a future sweep à la GF-788.
 
-**GF-807/805 (sweeper):** `ReplayJobSweeper` reapuje stale `"running"` joby (`:EXIT` killy)
-na `"failed"` po threshold + maže staré terminal joby.
+**GF-807/805 (sweeper):** `ReplayJobSweeper` reaps stale `"running"` jobs (`:EXIT` kills)
+to `"failed"` after a threshold + deletes old terminal jobs.
 
-**GF-827 (ghost-task guard):** `cancel_replay_job/1` flipne job na `"cancelled"`, ale
-fire-and-forget task běží dál a po dokončení by terminal stav přepsal. Proto je terminal
-zápis (`run_replay_job/1`→`finish_replay_job/3`) atomický conditional `Repo.update_all` s
-`WHERE status = "running"` — jakmile je řádek `"cancelled"` (cancel) nebo `"failed"`
-(sweeper), zápis matchne 0 řádků a je no-op. Invariant: cancelled job žádný jiný proces
-nepřepíše (žádný check-then-write race). `terminate_child` záměrně vynechán (node-local op
-nepřežije L3 Horde) — definitivní řešení = cooperative shutdown přes PubSub.
+**GF-827 (ghost-task guard):** `cancel_replay_job/1` flips the job to `"cancelled"`, but
+the fire-and-forget task keeps running and on completion would overwrite the terminal state. So the terminal
+write (`run_replay_job/1`→`finish_replay_job/3`) is an atomic conditional `Repo.update_all` with
+`WHERE status = "running"` — once the row is `"cancelled"` (cancel) or `"failed"`
+(sweeper), the write matches 0 rows and is a no-op. Invariant: no other process overwrites
+a cancelled job (no check-then-write race). `terminate_child` is deliberately omitted (a node-local op
+won't survive L3 Horde) — the definitive solution = cooperative shutdown via PubSub.
 
-**GF-832 (new_run_id unique):** `replay_jobs.new_run_id` je nově DB-unique (`create unique_index`)
-+ `ReplayJob.changeset` `unique_constraint(:new_run_id)`. Poslední obrana za `get_replay_job_for_run/1`
-`ORDER BY inserted_at DESC LIMIT 1` safety netem; duplicitní enqueue → `{:error, changeset}` →
-`ApiController.replay_cassette/2` 409 `new_run_id_already_exists` (ne raised `Ecto.ConstraintError`
-ani `CaseClauseError → 500`).
+**GF-832 (new_run_id unique):** `replay_jobs.new_run_id` is now DB-unique (`create unique_index`)
++ `ReplayJob.changeset` `unique_constraint(:new_run_id)`. The last line of defense behind the `get_replay_job_for_run/1`
+`ORDER BY inserted_at DESC LIMIT 1` safety net; a duplicate enqueue → `{:error, changeset}` →
+`ApiController.replay_cassette/2` 409 `new_run_id_already_exists` (not a raised `Ecto.ConstraintError`
+or `CaseClauseError → 500`).
 
-### Eval `Comparator.compare/2` je pure, ale Repo.all může být drahý
-Comparator pro každý compare call dělá 2× `from Ledger where run_id == ^x order_by`.
-Pro velké runy (10k+ spans) to znamená 20k+ row fetch + tree construction
-v paměti. Žádný caching. Acceptable pro L2 (manuální compare UI); pro
-auto-compare scheduler (L3) bude potřeba materializovaný diff cache.
+### Eval `Comparator.compare/2` is pure, but Repo.all can be expensive
+For each compare call the Comparator does 2× `from Ledger where run_id == ^x order_by`.
+For large runs (10k+ spans) that means 20k+ row fetch + tree construction
+in memory. No caching. Acceptable for L2 (manual compare UI); for an
+auto-compare scheduler (L3) a materialized diff cache will be needed.
 
 ---
 
-## Known gaps (discrepancies vs prompt task)
+## Known gaps (discrepancies vs the prompt task)
 
-- **`lib/span_chain/replay/` neexistuje** — feature je v `lib/span_chain/cassettes/`
-  (`replayer.ex`, `router.ex`) a doménový API/schema v `lib/span_chain/cassettes.ex`
-  + `cassette.ex`. Pojmenování v prompt task je pre-GF-712 historické.
-- ~~**`pipeline_supervisor.ex` neexistuje jako samostatný soubor**~~ — resolved
-  in **GF-739**: standalone modul `lib/span_chain/ingestion/pipeline_supervisor.ex`
-  (`use Supervisor`); `application.ex` jen odkazuje na něj v `broadway_children/0`.
-- **`/health` endpoint** — implementován v `router.ex:38-40`, neuvedeno v prompt task
-  ani v `docs/development.md` toplevel.
-- **`/v1/traces` endpoint a OTLP/HTTP** — GF-649 přidán v Sprintu 4, kompletně
-  popsán v `development.md:637-674`. Není v `## Architecture` snapshot
-  v CLAUDE.md jako primární cesta, ale je production-ready.
+- **`lib/span_chain/replay/` does not exist** — the feature is in `lib/span_chain/cassettes/`
+  (`replayer.ex`, `router.ex`) and the domain API/schema in `lib/span_chain/cassettes.ex`
+  + `cassette.ex`. The naming in the prompt task is pre-GF-712 historical.
+- ~~**`pipeline_supervisor.ex` doesn't exist as a separate file**~~ — resolved
+  in **GF-739**: a standalone module `lib/span_chain/ingestion/pipeline_supervisor.ex`
+  (`use Supervisor`); `application.ex` just references it in `broadway_children/0`.
+- **`/health` endpoint** — implemented in `router.ex:38-40`, not mentioned in the prompt task
+  or in `docs/development.md` top-level.
+- **`/v1/traces` endpoint and OTLP/HTTP** — GF-649 added in Sprint 4, fully
+  described in `development.md:637-674`. Not in the `## Architecture` snapshot
+  in CLAUDE.md as the primary path, but production-ready.
 - **L0 reference stack** (Agent + Orchestrator + AgentRegistry + AgentSupervisor)
-  běží v root supervision tree (`application.ex:14-17`) — není v ingestion cestě,
-  ale spotřebovává resources. Prompt task ho zmiňuje jako „DO NOT MODIFY".
+  runs in the root supervision tree (`application.ex:14-17`) — not in the ingestion path,
+  but consumes resources. The prompt task mentions it as "DO NOT MODIFY".
