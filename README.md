@@ -32,6 +32,26 @@ Tampered records and dropped epochs are **detectable**, not assumed away.
 
 ---
 
+## See it in action
+
+<p align="center">
+  <img src=".github/assets/spanchain-trail-evidence.png" alt="Span Chain Trail — hash-verified span tree with the agent's reasoning inline" width="860">
+</p>
+
+<p align="center">
+  <sub>The <b>Trail</b> — a run's full span tree, every entry hash-chain verified, with the agent's own reasoning captured inline.</sub>
+</p>
+
+<p align="center">
+  <img src=".github/assets/spanchain-structural-diff.png" alt="Span Chain Evals — structural span-tree diff between two runs" width="860">
+</p>
+
+<p align="center">
+  <sub><b>Evals compare</b> — a structural span-tree diff pinpoints the exact span where two runs diverge.</sub>
+</p>
+
+---
+
 ## Properties
 
 <table align="center">
