@@ -21,6 +21,30 @@ Silent failures — HTTP 200, wrong answer — become inspectable instead of irr
 
 ---
 
+## How Span Chain compares
+
+| | LangSmith / Langfuse | Span Chain |
+|---|---|---|
+| **Purpose** | Developer debug, visualization | Production auditability, integrity |
+| **Traces** | Mutable, vendor-controlled | Append-only, hash-chained |
+| **Replay** | Re-runs LLM ($) | Cassette replay ($0) |
+| **Evidence** | Logs | Cryptographic verification |
+| **Hosting** | Vendor SaaS | Self-hosted, MIT |
+
+**LangSmith** is built for development debugging and trace visualization.
+**Span Chain** is built for production auditability and tamper-evident evidence.
+
+**Langfuse** is built for tracing and analytics.
+**Span Chain** is built for cryptographic verification and deterministic
+replay without LLM calls.
+
+If you are targeting EU AI Act compliance, Span Chain's tamper-evident
+ledger provides the audit trail standard required for Article 12.
+
+> They show you what happened. We keep the proof.
+
+---
+
 ## How it works
 
 <p align="center">
