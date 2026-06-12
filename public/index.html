@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Span Chain by GhostFactory — Tamper-evident audit trail for AI agents</title>
-<meta name="description" content="Every agent leaves a record. We keep it. Span Chain creates a cryptographically verifiable audit trail for every step your AI agent takes. Self-host for free.">
+<meta name="description" content="Open-source cryptographic audit trail for AI agents. Tamper-evident receipts, offline verification, and deterministic replay. Compatible with LangChain, CrewAI, LlamaIndex via OTLP.">
 <link rel="canonical" href="https://www.spanchain.dev/">
 <!-- Open Graph / social preview (LinkedIn, Slack, Facebook) -->
 <meta property="og:type" content="website">
@@ -341,7 +341,7 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
   "@graph": [
     {
       "@type": "SoftwareApplication",
-      "@id": "https://spanchain.dev/#software",
+      "@id": "https://www.spanchain.dev/#software",
       "name": "Span Chain",
       "alternateName": "Span Chain by GhostFactory",
       "applicationCategory": "DeveloperApplication",
@@ -379,7 +379,7 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
     },
     {
       "@type": "FAQPage",
-      "@id": "https://spanchain.dev/#faq",
+      "@id": "https://www.spanchain.dev/#faq",
       "mainEntity": [
         {
           "@type": "Question",
@@ -426,7 +426,7 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
           "name": "How do I self-host Span Chain?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Span Chain is deployed via a single command: docker compose up ghostfactory-art/spanchain. The core is MIT licensed. There are no usage limits, no external vendor dependencies, and no trace data leaves the user's infrastructure."
+            "text": "Span Chain is self-hosted with Docker Compose: clone the GitHub repository (ghostfactory-art/spanchain), copy .env.example to .env, and run docker compose up. The core is MIT licensed. There are no usage limits, no external vendor dependencies, and no trace data leaves the user's infrastructure."
           }
         },
         {
@@ -511,6 +511,11 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
         every LLM call, every decision, every tool call captured in a tamper-evident, append-only chain.
         Cryptographically verifiable. Deterministically replayable without LLM calls.
       </p>
+      <ul class="hero-bullets">
+        <li>Cryptographic receipts for every action</li>
+        <li>Offline verification via <code>verify_ledger</code></li>
+        <li>Works with LangChain · CrewAI · LlamaIndex via OTLP</li>
+      </ul>
     </div>
 
     <div class="hero-grid">
@@ -662,7 +667,7 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
           <div class="field"><div class="lbl">Built by</div><div class="val">You</div></div>
           <div class="field"><div class="lbl">License</div><div class="val">MIT</div></div>
           <div class="field"><div class="lbl">Sheet</div><div class="val">01 / 01</div></div>
-          <div class="field"><div class="lbl">Rev</div><div class="val">v0.24</div></div>
+          <div class="field"><div class="lbl">Rev</div><div class="val">v0.54.1</div></div>
         </div>
       </article>
 
@@ -672,7 +677,9 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
       <a class="btn btn-stamp" href="https://github.com/ghostfactory-art/spanchain">Self-host for free <span class="arr">→</span></a>
       <a class="btn btn-ghost" href="mailto:jonesjiri@gmail.com">Request early access</a>
     </div>
-    <pre class="mono" style="margin-top:24px;font-size:13px;opacity:0.7;letter-spacing:.04em;">docker compose up ghostfactory-art/spanchain</pre>
+    <pre class="mono" style="margin-top:24px;font-size:13px;opacity:0.7;letter-spacing:.04em;">git clone https://github.com/ghostfactory-art/spanchain.git
+cd spanchain && cp .env.example .env
+docker compose up</pre>
   </div>
 </header>
 
@@ -866,7 +873,7 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
       <div class="field"><div class="lbl-t">DWG #</div><div class="val">GF-SPAN-01</div></div>
       <div class="field"><div class="lbl-t">Scale</div><div class="val">1:1</div></div>
       <div class="field"><div class="lbl-t">Sheet</div><div class="val">02 / 03</div></div>
-      <div class="field"><div class="lbl-t">Rev</div><div class="val">v0.24</div></div>
+      <div class="field"><div class="lbl-t">Rev</div><div class="val">v0.54.1</div></div>
       <div class="field"><div class="lbl-t">License</div><div class="val">MIT · 2026</div></div>
     </div>
   </div>
@@ -1149,8 +1156,10 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
   <div class="wrap">
     <div class="eu-note" style="margin-bottom:54px">
       <strong>EU AI Act · Article 12</strong>
-      EU AI Act Article 12 requires audit trails integrated into core system design — not added as an afterthought. Deadline: August 2026. Span Chain is built for this.
+      EU AI Act Article 12 requires audit trails integrated into core system design — not added as an afterthought. Annex III applies from 2. 12. 2027. Span Chain is built for this.
     </div>
+    <p class="compliance-heading">Built for audit &amp; compliance programs</p>
+    <p class="lede">Supports EU AI Act Article 12 traceability, SOC 2 audit-trail controls, and HIPAA audit logging.</p>
 
     <div class="section-tag">06 — Ship your first verified run</div>
     <h2>The chain is <em>open.</em></h2>
@@ -1159,7 +1168,7 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
       <a class="btn btn-stamp" href="https://github.com/ghostfactory-art/spanchain">Self-host for free <span class="arr">→</span></a>
       <a class="btn btn-ghost" href="mailto:jonesjiri@gmail.com">Request early access</a>
     </div>
-    <div class="closing-quickstart">docker compose up ghostfactory-art/spanchain</div>
+    <div class="closing-quickstart">git clone https://github.com/ghostfactory-art/spanchain.git<br>cd spanchain &amp;&amp; cp .env.example .env<br>docker compose up</div>
     <div class="closing-seal">
       <svg width="36" height="36" viewBox="6 4 68 68" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <defs>
@@ -1200,10 +1209,10 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
     <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Yes. Span Chain is OpenTelemetry (OTLP/HTTP) native. Engineers can connect any OTel-compatible client, including the official Span Chain Python and TypeScript SDKs, without proprietary vendor lock-in.</p>
 
     <h3 style="margin-top:2rem;margin-bottom:.5rem">How do I self-host Span Chain?</h3>
-    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Span Chain is deployed via a single command: <code>docker compose up ghostfactory-art/spanchain</code>. The core is MIT licensed. There are no usage limits, no external vendor dependencies, and no trace data leaves the user's infrastructure.</p>
+    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Span Chain is self-hosted with Docker Compose: clone the GitHub repository (<code>ghostfactory-art/spanchain</code>), copy <code>.env.example</code> to <code>.env</code>, and run <code>docker compose up</code>. The core is MIT licensed. There are no usage limits, no external vendor dependencies, and no trace data leaves the user's infrastructure.</p>
 
     <h3 style="margin-top:2rem;margin-bottom:.5rem">Is Span Chain relevant for EU AI Act compliance?</h3>
-    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Yes. EU AI Act Article 12 requires strict audit trail documentation for high-risk AI systems by August 2026. Span Chain's append-only, cryptographically verifiable ledger provides the exact technical foundation needed to meet these legal compliance requirements.</p>
+    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Yes. EU AI Act Article 12 requires strict audit trail documentation for high-risk AI systems (Annex III applies from 2. 12. 2027). Span Chain's append-only, cryptographically verifiable ledger provides the exact technical foundation needed to meet these legal compliance requirements.</p>
 
     <h3 style="margin-top:2rem;margin-bottom:.5rem">What is the performance baseline for Span Chain?</h3>
     <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Span Chain is built on Elixir/OTP, isolating every agent session into its own BEAM process. The system is benchmarked at 571 spans/second with 1,000 concurrent agents, achieving 0 corrupted chains and perfect integrity during the 10,000-span stress tests.</p>

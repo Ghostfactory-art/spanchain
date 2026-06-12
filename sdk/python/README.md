@@ -193,8 +193,22 @@ gf.init(
 
 Auth header: `Authorization: Bearer <api_key>` — matches
 `GfExperiment.Ingestion.AuthPlug`. The SDK **never** raises to the caller —
-send-path failures are silent debug logs + in-memory buffer
-(`deque(maxlen=1000)`).
+a failed send logs a warning and parks the span in an in-memory buffer
+(`deque(maxlen=1000)`, FIFO eviction is also logged as a warning).
+
+## Reliability — buffered spans + flush (GF-943)
+
+Spans that fail to send (backend outage, network error) are buffered, not
+lost. Re-send them with `gf.flush()` — typically at agent shutdown or after
+a known outage window:
+
+```python
+sent = await gf.flush()   # drains the buffer, re-sends each span
+                          # still-failing spans are re-buffered; returns sent count
+```
+
+The buffer holds max 1000 spans; past that the oldest span is dropped
+(permanent loss) with a warning on the `ghostfactory` logger.
 
 ## Architecture
 
@@ -202,10 +216,11 @@ send-path failures are silent debug logs + in-memory buffer
   would share state across coroutines)
 - `_span.py` — `Span` dataclass + `to_dict()` with ISO 8601 "Z" suffix
 - `_exporter.py` — `httpx` async POST with 1 retry, silent drop on failure
-- `_buffer.py` — in-memory `deque(maxlen=1000)` for spans that failed to send
+- `_buffer.py` — in-memory `deque(maxlen=1000)` for spans that failed to send;
+  drained by `gf.flush()` (GF-943)
 - `attrs.py` — OTel GenAI constants + `gf.*` extensions + `hash_prompt`
   utility (GF-735, GF-738)
-- `__init__.py` — public API: `init`, `trace`, `span`, `set_eval_id`,
+- `__init__.py` — public API: `init`, `trace`, `span`, `flush`, `set_eval_id`,
   `eval_scope`, `attrs`
 
 For backend setup, end-to-end smoke tests, and architecture-level details,
@@ -216,5 +231,5 @@ and [gf_experiment/docs/architecture-map.md](../gf_experiment/docs/architecture-
 
 ```bash
 pytest
-# → 47 passed (Sprint 8)
+# → 60 passed (GF-943)
 ```

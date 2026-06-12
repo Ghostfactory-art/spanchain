@@ -16,8 +16,14 @@ Span Chain treats the **agent session** as the unit of analysis — not the indi
 The entire run, with its parent/child span hierarchy intact, is recorded to an
 **immutable, hash-chain–verified ledger** as the source of truth.
 
-Re-run a recorded session and you get the **same chain every time**.
+Replay a recorded session and its spans are **re-ingested into a new, independently
+verified chain** — identical structure, fresh `run_id`, no LLM re-execution. Replay
+validates Span Chain's integrity, not your agent's behavior.
 Silent failures — HTTP 200, wrong answer — become inspectable instead of irreproducible.
+
+Every agent action produces a **cryptographic receipt** — a tamper-evident record
+SHA-256 chained to the previous action. Append-only. Offline verification via
+`verify_ledger` — no LLM calls or external services required.
 
 ---
 
@@ -39,7 +45,11 @@ Silent failures — HTTP 200, wrong answer — become inspectable instead of irr
 replay without LLM calls.
 
 If you are targeting EU AI Act compliance, Span Chain's tamper-evident
-ledger provides the audit trail standard required for Article 12.
+ledger provides the tamper-evident audit trail that makes Article 12 traceability verifiable.
+
+**Audit trail for compliance programs:** designed to support EU AI Act Article 12
+traceability, SOC 2 audit-trail controls, and HIPAA audit-logging requirements.
+Span Chain provides the evidence layer — your compliance program provides the rest.
 
 > They show you what happened. We keep the proof.
 
@@ -96,6 +106,12 @@ Tampered records and dropped epochs are **detectable**, not assumed away.
       <sub>Dropped epochs and mutations surface automatically</sub>
     </td>
   </tr>
+  <tr>
+    <td colspan="3" align="center">
+      <b>Non-repudiation</b><br>
+      <sub>Cryptographic proof that an agent action occurred and was not modified</sub>
+    </td>
+  </tr>
 </table>
 
 ---
@@ -134,13 +150,19 @@ UI at **http://localhost** · Ingest API at **http://localhost/ingest**
 **Send a trace (OTLP/HTTP JSON):**
 
 ```bash
-curl -X POST http://localhost/v1/traces \
+curl -X POST https://localhost/v1/traces --insecure \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $SPANCHAIN_KEY" \
   -d @your-trace.json
 ```
 
+> **TLS:** default Docker setup uses a local CA — add `--insecure` to skip, or trust once
+> via `caddy trust`. See [Known Issues](#known-issues) for details.
+
 Or use the plain JSON endpoint at `http://localhost/ingest` — no OTLP SDK required.
+
+Works natively with **LangChain, CrewAI, LlamaIndex, AutoGen, and Pydantic AI**
+via standard OpenTelemetry (OTLP) — no framework-specific SDK required.
 
 ---
 
@@ -167,7 +189,7 @@ Usage examples in [`sdk/python/README.md`](sdk/python/README.md) and
 
 ## Status
 
-Active development · launching soon.
+v0.x · launched June 2026 · active development.
 
 A **[GhostFactory](https://ghostfactory.art)** product — [spanchain.art](https://spanchain.art)
 
