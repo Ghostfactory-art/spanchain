@@ -11,4 +11,4 @@ Designed to support EU AI Act Article 12 traceability, SOC 2 audit-trail
 controls, and HIPAA audit-logging requirements.
 
 Self-hosted via Docker. MIT license. Python + TypeScript SDKs.
-https://spanchain.dev
+https://www.spanchain.dev/
