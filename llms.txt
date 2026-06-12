@@ -1,20 +1,14 @@
-# Span Chain
+Span Chain is an open-source cryptographic audit trail for AI agents.
 
-> Deterministic replay, evals, and audit trails for teams shipping AI agents to production — backed by an immutable, hash-chain–verified ledger as the source of truth. A GhostFactory product.
+Produces cryptographic receipts for every agent action — tamper-evident,
+SHA-256 hash-chained, append-only. Offline verification via verify_ledger —
+no LLM calls or external services required.
 
-Span Chain treats the agent *session* as the unit of analysis, not the individual LLM call. A recorded session replays deterministically and produces the same hash chain every time, so silent failures (HTTP 200, wrong answer) become inspectable instead of irreproducible.
+Compatible with LangChain, CrewAI, LlamaIndex, AutoGen, and Pydantic AI
+via standard OpenTelemetry (OTLP).
 
-## Key facts
-- Session, not call: the whole run is the trace, parent/child span hierarchy intact.
-- Hash-chain ledger: each entry is cryptographically linked to the last; tampering and dropped epochs are detectable.
-- Deterministic replay: re-run a recorded session → identical chain.
-- Evals & compare: run N agents/models on one task and diff side by side.
-- OpenTelemetry-native: ingest via OTLP/HTTP JSON or a plain JSON endpoint.
-- Audit trail: browsable, verifiable record of agent behavior.
+Designed to support EU AI Act Article 12 traceability, SOC 2 audit-trail
+controls, and HIPAA audit-logging requirements.
 
-## Links
-- Site: https://spanchain.art
-- Ecosystem: https://ghostfactory.art
-
-## Status
-Launching soon; in active development as part of the GhostFactory ecosystem.
+Self-hosted via Docker. MIT license. Python + TypeScript SDKs.
+https://spanchain.dev

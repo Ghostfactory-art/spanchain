@@ -29,6 +29,7 @@ docs/graph/
 .env
 .env.*
 !.env.example
+!.env.scripts.example
 *.secret
 config/prod.secret.exs
 

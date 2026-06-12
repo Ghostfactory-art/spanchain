@@ -4,12 +4,14 @@ Public API:
     gf.init(endpoint, api_key, run_id=None)
     gf.trace(name="...")              — decorator for async functions (root span)
     async with gf.span(name, **attrs) — context manager for nested spans
+    await gf.flush()                  — re-send spans buffered after failed sends (GF-943)
     gf.set_eval_id(eval_id)           — sticky eval_id for the current async context (GF-727)
     async with gf.eval_scope(eval_id) — scoped eval_id with auto-restore (GF-727)
     gf.attrs                           — OTel GenAI span attribute constants (GF-735)
 """
 
 import functools
+import logging
 import secrets
 import uuid
 from contextlib import asynccontextmanager
@@ -17,12 +19,16 @@ from datetime import datetime, timezone
 from typing import Any
 
 from . import attrs
+from ._buffer import drain as buffer_drain
 from ._buffer import push as buffer_push
+from ._buffer import size as buffer_size
 from ._context import _current_span_id, _current_trace_id, _eval_id, _run_id
 from ._exporter import send_span
 from ._span import Span
 
-__all__ = ["init", "trace", "span", "set_eval_id", "eval_scope", "attrs"]
+__all__ = ["init", "trace", "span", "flush", "set_eval_id", "eval_scope", "attrs"]
+
+logger = logging.getLogger("ghostfactory")
 
 _endpoint: str | None = None
 _api_key: str | None = None
@@ -114,7 +120,43 @@ async def span(name: str, **attributes: Any):
         _current_trace_id.reset(trace_token)
         try:
             sent = await send_span(s, _endpoint, _api_key)
-            if not sent:
-                buffer_push(s)
         except Exception:  # noqa: BLE001 — SDK never raises to caller
+            sent = False
+        if not sent:
             buffer_push(s)
+            logger.warning(
+                "GF SDK: span %r failed to send — buffered for gf.flush() (%d buffered)",
+                s.name,
+                buffer_size(),
+            )
+
+
+async def flush() -> int:
+    """Re-send spans buffered after failed sends (GF-943). Returns the sent count.
+
+    Drains the buffer and re-sends each span individually; spans that still
+    fail go back into the buffer (order preserved among themselves). Send
+    failures never raise (SDK contract) — only calling before `init()` does.
+    """
+    if _endpoint is None or _api_key is None:
+        raise RuntimeError("ghostfactory.init() must be called first")
+
+    spans = buffer_drain()
+    sent_count = 0
+    for s in spans:
+        try:
+            ok = await send_span(s, _endpoint, _api_key)
+        except Exception:  # noqa: BLE001 — SDK never raises to caller
+            ok = False
+        if ok:
+            sent_count += 1
+        else:
+            buffer_push(s)
+
+    failed = len(spans) - sent_count
+    if failed:
+        logger.warning(
+            "GF SDK: flush() could not deliver %d span(s) — re-buffered for the next flush",
+            failed,
+        )
+    return sent_count
