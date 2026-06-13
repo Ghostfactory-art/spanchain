@@ -41,7 +41,12 @@ defmodule SpanChain.Application do
         # GF-807/805 — periodic sweeper: stale "running" jobs (task killed without rescue)
         # → "failed"; old completed/failed jobs → deleted (retention). Standalone
         # leaf, Repo-OK. Test env: sweep intervals effectively disabled via config seams.
-        SpanChain.Cassettes.ReplayJobSweeper
+        SpanChain.Cassettes.ReplayJobSweeper,
+
+        # GF-788 — periodic hash-chain integrity sweep. Queries recent runs, calls
+        # verify_ledger/1 per run; :chain_broken → Logger.error + telemetry.
+        # Test seam: verify_sweep_interval_ms: :infinity (GenServer runs, no auto-sweep).
+        SpanChain.LedgerVerifier
       ] ++ broadway_children() ++ http_children() ++ phoenix_children()
 
     opts = [strategy: :one_for_one, name: SpanChain.Supervisor]

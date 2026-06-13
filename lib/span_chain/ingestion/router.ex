@@ -142,8 +142,15 @@ defmodule SpanChain.Ingestion.Router do
         end
 
       {:error, :missing_run_id} ->
-        msg = "resource attribute 'service.instance.id' is required as run_id"
-        conn = put_json_resp(conn, 400, %{"error" => msg})
+        conn =
+          put_json_resp(conn, 400, %{
+            "error" => "missing_run_id",
+            "message" =>
+              "Resource attribute 'service.instance.id' is required as the run_id carrier.",
+            "hint" => "Add this to your OTel SDK resource configuration:",
+            "example" => ~s(resource.attributes["service.instance.id"] = "my-agent-run-001")
+          })
+
         %{conn: conn, run_ids: [], span_count: 0, status: 400}
     end
   end

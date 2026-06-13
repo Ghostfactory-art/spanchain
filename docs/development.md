@@ -258,6 +258,10 @@ These were tracked tradeoffs that have since been fixed. Kept here as a paper tr
     trusted-proxy config) is the more robust solution — deferred (Later) because it needs a new
     dependency, which GF-851 forbids.
 
+> **Note:** Trail and Eval views are public by default (no auth required).
+> Exposed: run_ids, span names, timing, gf.agent.* config diffs.
+> Payloads remain auth-gated. Set TRAIL_AUTH_ENABLED=true for restricted access.
+
 ## Open L2 limitations
 
 - **Buffer is not persistent.** `BufferProducer` is in-memory `:queue`. A crash
@@ -727,8 +731,10 @@ JSON is enough. OTLP/HTTP JSON is a full part of the OTel specification.
 - `startTimeUnixNano` / `endTimeUnixNano` (string ns) → ISO 8601 UTC with microsecond
   precision (Elixir `DateTime` can't do nanoseconds; ns truncated to μs — L2 acceptable)
 - Attributes: KeyValue list → flat `%{key => value}` map; supports `stringValue`,
-  `intValue`, `boolValue`. `doubleValue`, `arrayValue`, `kvlistValue` + unknown
-  fields (`kind`, `status`, `events`, `links`, `traceState`, ...) silently ignored.
+  `intValue`, `boolValue`. `doubleValue` silently ignored. `arrayValue` / `kvlistValue`
+  → JSON-stringified string via `Jason.encode/inspect` fallback (GF-974, ADR-004
+  "lossy-but-visible"). Unknown fields (`kind`, `status`, `events`, `links`,
+  `traceState`, ...) silently ignored.
 - Multiple `resourceSpans` in one request — grouped by `run_id` (`Enum.each`
   → `SessionGenServer.ingest_spans/2` per group)
 
@@ -784,7 +790,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"     # Windows
 # source .venv/bin/activate && pip install -e ".[dev]"     # Unix
 pytest
-# → 21 passed in ~2.4s
+# → 65 passed in ~2.4s
 ```
 
 Smoke test against a running backend (requires `mix phx.server`):
@@ -875,7 +881,7 @@ SDK never raises to the caller — send-path failures are silent
 | Endpoint | `/v1/traces` (OTLP, GF-741) | `/v1/traces` (OTLP) |
 | Payload | `{resourceSpans: [...]}` | `{resourceSpans: [...]}` |
 | `run_id` attribute | `service.instance.id` | `service.instance.id` |
-| Send model | per-span on context exit | buffered 50 / 5 s + `flush()` |
+| Send model | buffered 50 / 5 s + `flush()` (GF-944) | buffered 50 / 5 s + `flush()` |
 | Eval ID | `set_eval_id` / `eval_scope` per-task isolated (GF-727 / GF-744) | `evalScope` per-task isolated via `AsyncLocalStorage` (GF-733) — parity with Python |
 | Attribute types | int/bool/float dispatch (GF-742) | int/bool/float dispatch (GF-742) |
 | Token / agent / reasoning / task attrs | `attrs` module — `gen_ai.*` + `gf.usage.*` + `gf.agent.*` + `gf.reasoning.*` + `gf.task.*` + `hash_prompt` (GF-735 / GF-738 / GF-736 / GF-737) | `attrs` namespace — same constants + `hashPrompt` (cross-language string-value parity by test) |

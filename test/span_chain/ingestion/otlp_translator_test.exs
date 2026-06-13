@@ -166,5 +166,74 @@ defmodule SpanChain.Ingestion.OtlpTranslatorTest do
       assert {:ok, [{"double-int", nil, [span]}]} = OtlpTranslator.translate(body)
       assert span["attributes"]["temperature"] == 0
     end
+
+    test "GF-974: arrayValue attribute is stringified to JSON, not dropped" do
+      body =
+        valid_otlp_request("arr-test", %{
+          "attributes" => [
+            %{
+              "key" => "my_list",
+              "value" => %{
+                "arrayValue" => %{
+                  "values" => [
+                    %{"stringValue" => "a"},
+                    %{"stringValue" => "b"}
+                  ]
+                }
+              }
+            }
+          ]
+        })
+
+      assert {:ok, [{"arr-test", nil, [span]}]} = OtlpTranslator.translate(body)
+      assert is_binary(span["attributes"]["my_list"])
+      refute is_nil(span["attributes"]["my_list"])
+      assert {:ok, _} = Jason.decode(span["attributes"]["my_list"])
+    end
+
+    test "GF-974: kvlistValue attribute is stringified to JSON, not dropped" do
+      body =
+        valid_otlp_request("kv-test", %{
+          "attributes" => [
+            %{
+              "key" => "my_map",
+              "value" => %{
+                "kvlistValue" => %{
+                  "values" => [
+                    %{"key" => "x", "value" => %{"intValue" => 1}}
+                  ]
+                }
+              }
+            }
+          ]
+        })
+
+      assert {:ok, [{"kv-test", nil, [span]}]} = OtlpTranslator.translate(body)
+      assert is_binary(span["attributes"]["my_map"])
+      assert {:ok, _} = Jason.decode(span["attributes"]["my_map"])
+    end
+
+    test "GF-974: nested arrayValue produces valid JSON string" do
+      body =
+        valid_otlp_request("nested-test", %{
+          "attributes" => [
+            %{
+              "key" => "nested",
+              "value" => %{
+                "arrayValue" => %{
+                  "values" => [
+                    %{"arrayValue" => %{"values" => [%{"stringValue" => "deep"}]}}
+                  ]
+                }
+              }
+            }
+          ]
+        })
+
+      assert {:ok, [{"nested-test", nil, [span]}]} = OtlpTranslator.translate(body)
+      assert is_binary(span["attributes"]["nested"])
+      assert {:ok, decoded} = Jason.decode(span["attributes"]["nested"])
+      assert is_list(decoded) or is_map(decoded)
+    end
   end
 end

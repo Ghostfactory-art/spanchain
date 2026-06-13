@@ -15,6 +15,7 @@ defmodule SpanChain.Web.Router do
     plug(:put_root_layout, html: {SpanChain.Web.Layouts, :root})
     plug(:protect_from_forgery)
     plug(:put_secure_browser_headers)
+    plug(:check_trail_auth)
   end
 
   # GF-789: JSON API for the Span Chain UI (React). Corsica MUST be first — the browser
@@ -44,9 +45,12 @@ defmodule SpanChain.Web.Router do
     # GF-791: the root serves the static Records Bureau UI (PageController → send_file).
     # The LiveView Trail stays at /trail (preserved).
     get("/", PageController, :index)
-    live("/trail", TrailLive, :index)
-    live("/trail/:run_id", TrailLive, :detail)
-    live("/eval/:eval_id", EvalLive)
+
+    live_session :default, on_mount: [{SpanChain.Web.TrailAuth, :require_auth}] do
+      live("/trail", TrailLive, :index)
+      live("/trail/:run_id", TrailLive, :detail)
+      live("/eval/:eval_id", EvalLive)
+    end
   end
 
   scope "/api", SpanChain.Web do
@@ -69,10 +73,30 @@ defmodule SpanChain.Web.Router do
 
     # Cassettes
     get("/cassettes", ApiController, :list_cassettes)
+    # GF-945: record endpoint on 4001 (Caddy proxies /api — unlike port 4000 Plug.Router)
+    post("/cassettes", ApiController, :record_cassette)
     post("/cassettes/:id/replay", ApiController, :replay_cassette)
     # GF-798: async replay job polling (distinct path segment — no clash with the above).
     get("/cassettes/replay_jobs/:id", ApiController, :get_replay_job)
     # GF-823: cancel an async replay job (same resource as the polling GET).
     delete("/cassettes/replay_jobs/:id", ApiController, :cancel_replay_job)
+  end
+
+  defp check_trail_auth(conn, _opts) do
+    if Application.get_env(:span_chain, :trail_auth_enabled, false) do
+      expected_pass = Application.get_env(:span_chain, :api_key, "")
+
+      case Plug.BasicAuth.parse_basic_auth(conn) do
+        {_user, ^expected_pass} ->
+          put_session(conn, :trail_authenticated, true)
+
+        _ ->
+          conn
+          |> Plug.BasicAuth.request_basic_auth(realm: "Span Chain")
+          |> halt()
+      end
+    else
+      conn
+    end
   end
 end

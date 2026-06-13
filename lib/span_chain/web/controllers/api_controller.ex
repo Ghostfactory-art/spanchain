@@ -317,6 +317,45 @@ defmodule SpanChain.Web.ApiController do
 
   defp generate_replay_run_id(cassette_id), do: "replay-#{cassette_id}-#{Ecto.UUID.generate()}"
 
+  @doc "GF-945: record a cassette snapshot for a given run via the Caddy-proxied port 4001 API."
+  def record_cassette(conn, %{"run_id" => run_id, "cassette_id" => cassette_id} = params) do
+    name = Map.get(params, "name", run_id)
+
+    case Cassettes.record(run_id, cassette_id: cassette_id, name: name) do
+      {:ok, cassette} ->
+        conn
+        |> put_status(201)
+        |> json(%{
+          cassette: %{
+            "id" => cassette.cassette_id,
+            "run_id" => cassette.run_id,
+            "name" => cassette.name,
+            "recorded_at" => cassette.recorded_at,
+            "inserted_at" => cassette.inserted_at
+          }
+        })
+
+      {:error, :run_not_found} ->
+        conn |> put_status(404) |> json(%{error: "run_not_found"})
+
+      {:error, :missing_cassette_id} ->
+        # Defensive: empty string "" passes pattern match but fails domain guard
+        conn |> put_status(400) |> json(%{error: "missing_cassette_id"})
+
+      {:error, %Ecto.Changeset{}} ->
+        conn |> put_status(422) |> json(%{error: "validation_failed"})
+
+      {:error, reason} ->
+        conn |> put_status(422) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  def record_cassette(conn, _params) do
+    conn
+    |> put_status(400)
+    |> json(%{error: "missing_required_params", message: "run_id and cassette_id are required"})
+  end
+
   # --------------------------------------------------------------------------
   # CORS preflight — dead target. Corsica (the first plug in :api) halts an allowed-origin
   # preflight first; a disallowed origin is halted by AuthPlug (401). The route must exist

@@ -15,7 +15,7 @@ defmodule SpanChain.Ingestion.OtlpTranslator do
   - `startTimeUnixNano` / `endTimeUnixNano` (string ns) → ISO 8601
     (microsecond precision; `DateTime` cannot handle nanoseconds)
   - OTLP `KeyValue` attributes → flat `%{key => value}` map
-    (`stringValue`, `intValue`, `boolValue`, `doubleValue`; `arrayValue`/`kvlistValue` ignored — L3 scope)
+    (`stringValue`, `intValue`, `boolValue`, `doubleValue` native; `arrayValue`/`kvlistValue` JSON-stringified — GF-974)
   - Unknown OTLP fields (`kind`, `status`, `events`, `links`, ...) silently ignored — L3 scope
 
   ## Example input
@@ -143,11 +143,23 @@ defmodule SpanChain.Ingestion.OtlpTranslator do
       when is_binary(k) and is_number(v) ->
         Map.put(acc, k, v)
 
-      # arrayValue, kvlistValue — L3 scope, silently ignored
+      %{"key" => k, "value" => %{"arrayValue" => arr}}, acc when is_binary(k) ->
+        Map.put(acc, k, stringify_complex(arr))
+
+      %{"key" => k, "value" => %{"kvlistValue" => kv}}, acc when is_binary(k) ->
+        Map.put(acc, k, stringify_complex(kv))
+
       _, acc ->
         acc
     end)
   end
 
   defp translate_attributes(_), do: %{}
+
+  defp stringify_complex(value) do
+    case Jason.encode(value) do
+      {:ok, json} -> json
+      {:error, _} -> inspect(value)
+    end
+  end
 end

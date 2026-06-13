@@ -28,6 +28,9 @@ if config_env() != :test do
       System.get_env("BATCH_FLUSH_TIMEOUT_MS", "100") |> String.to_integer()
 end
 
+config :span_chain,
+  trail_auth_enabled: System.get_env("TRAIL_AUTH_ENABLED") == "true"
+
 if config_env() == :prod do
   # GF-771: production secrets come exclusively from env vars (fail-fast at startup
   # if missing). No hardcoded prod secret in the code or in git.
