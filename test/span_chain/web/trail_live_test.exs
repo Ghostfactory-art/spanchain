@@ -87,6 +87,33 @@ defmodule SpanChain.Web.TrailLiveTest do
     end
   end
 
+  describe "TRAIL_AUTH_ENABLED gate (GF-978)" do
+    test "GET /trail with TRAIL_AUTH_ENABLED=true and no credentials returns 401" do
+      Application.put_env(:span_chain, :trail_auth_enabled, true)
+      on_exit(fn -> Application.put_env(:span_chain, :trail_auth_enabled, false) end)
+
+      conn = build_conn() |> get("/trail")
+      assert conn.status == 401
+      assert Plug.Conn.get_resp_header(conn, "www-authenticate") != []
+    end
+
+    test "GET /trail without TRAIL_AUTH_ENABLED returns 200 (default behavior)" do
+      conn = build_conn() |> get("/trail")
+      assert conn.status == 200
+    end
+
+    test "on_mount with trail_auth_enabled=true and no session halts WebSocket" do
+      # WebSocket upgrade bypasses the Plug pipeline — on_mount is the second guard.
+      # Test via direct function call: live() can't simulate this path because it
+      # goes through the HTTP plug first (which would 401 before LiveView mounts).
+      Application.put_env(:span_chain, :trail_auth_enabled, true)
+      on_exit(fn -> Application.put_env(:span_chain, :trail_auth_enabled, false) end)
+
+      socket = %Phoenix.LiveView.Socket{}
+      assert {:halt, _socket} = SpanChain.Web.TrailAuth.on_mount(:require_auth, %{}, %{}, socket)
+    end
+  end
+
   describe "subscribe isolation" do
     test "detail A unchanged after manual broadcast for run B" do
       run_a = fresh_run_id()

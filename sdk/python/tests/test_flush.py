@@ -1,10 +1,8 @@
 """gf.flush() + buffer visibility — silent data loss fix (GF-943).
 
-Before GF-943, `_buffer.drain()` had no caller: spans buffered after a failed
-send stayed there forever (or were FIFO-dropped silently after 1000 items).
-These tests pin the new contract: buffering logs a warning, `gf.flush()`
-re-sends buffered spans, still-failing spans are re-buffered, FIFO eviction
-logs a warning (permanent loss is never silent).
+GF-944: spans are now enqueued rather than sent immediately. Tests that
+verify failure → buffer behaviour now call gf.flush() to trigger the send
+attempt; assertions on _buffer happen after flush().
 """
 
 import logging
@@ -21,13 +19,7 @@ from ghostfactory._span import Span
 
 OK_RESPONSE = httpx.Response(200, json={"partialSuccess": {"rejectedSpans": 0}})
 
-
-@pytest.fixture(autouse=True)
-def _clear_buffer():
-    """The buffer is module-level state — isolate it between tests."""
-    _buffer._buffer.clear()
-    yield
-    _buffer._buffer.clear()
+# _reset_sdk_state is in conftest.py (autouse) — no per-file fixture needed.
 
 
 def _make_span(name: str = "s") -> Span:
@@ -48,9 +40,11 @@ async def test_failed_send_buffers_span_and_logs_warning(caplog):
     )
     gf.init("http://localhost:4000", "test-secret", run_id="outage-run")
 
+    # GF-944: span is enqueued, not sent immediately — flush() triggers the send
     with caplog.at_level(logging.WARNING, logger="ghostfactory"):
         async with gf.span("during_outage"):
             pass
+        await gf.flush()
 
     assert _buffer.size() == 1
     assert any("buffered" in r.message for r in caplog.records)
@@ -67,6 +61,9 @@ async def test_flush_after_outage_sends_buffered_spans():
         pass
     async with gf.span("second"):
         pass
+
+    # GF-944: flush with backend still down → batch send fails → spans go to buffer
+    await gf.flush()
     assert _buffer.size() == 2
 
     # Backend comes back up
@@ -88,13 +85,12 @@ async def test_flush_rebuffers_spans_when_backend_still_down(caplog):
 
     async with gf.span("doomed"):
         pass
-    assert _buffer.size() == 1
 
     with caplog.at_level(logging.WARNING, logger="ghostfactory"):
         sent = await gf.flush()
 
     assert sent == 0
-    assert _buffer.size() == 1  # re-buffered, not lost
+    assert _buffer.size() == 1  # re-buffered after failed batch send
     assert any("flush()" in r.message for r in caplog.records)
 
 
@@ -104,7 +100,7 @@ async def test_flush_empty_buffer_returns_zero():
 
 
 async def test_flush_without_init_raises_runtime_error():
-    # Reset module state (same pattern as test_trace.py)
+    # Reset module state (conftest also does this, but be explicit)
     import ghostfactory as gf_mod
 
     gf_mod._endpoint = None

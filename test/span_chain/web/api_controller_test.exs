@@ -465,4 +465,44 @@ defmodule SpanChain.Web.ApiControllerTest do
       assert conn.status == 422
     end
   end
+
+  describe "record_cassette (GF-945) POST /api/cassettes" do
+    test "record_cassette: valid run_id + cassette_id → 201 + cassette JSON" do
+      seed_run("cas945-run")
+
+      conn =
+        build_conn()
+        |> authed()
+        |> post("/api/cassettes", %{run_id: "cas945-run", cassette_id: "cas945-id"})
+
+      assert conn.status == 201
+
+      assert %{"cassette" => %{"id" => "cas945-id", "run_id" => "cas945-run"}} =
+               json_response(conn, 201)
+    end
+
+    test "record_cassette: non-existent run_id → 404 run_not_found" do
+      conn =
+        build_conn()
+        |> authed()
+        |> post("/api/cassettes", %{run_id: "no-such-run-945", cassette_id: "cas945-x"})
+
+      assert conn.status == 404
+      assert %{"error" => "run_not_found"} = json_response(conn, 404)
+    end
+
+    test "record_cassette: missing run_id in body → 400" do
+      conn =
+        build_conn()
+        |> authed()
+        |> post("/api/cassettes", %{cassette_id: "cas945-y"})
+
+      assert conn.status == 400
+    end
+
+    test "record_cassette: no Bearer token → 401" do
+      conn = post(build_conn(), "/api/cassettes", %{run_id: "any", cassette_id: "any"})
+      assert conn.status == 401
+    end
+  end
 end

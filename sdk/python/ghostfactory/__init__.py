@@ -4,12 +4,13 @@ Public API:
     gf.init(endpoint, api_key, run_id=None)
     gf.trace(name="...")              — decorator for async functions (root span)
     async with gf.span(name, **attrs) — context manager for nested spans
-    await gf.flush()                  — re-send spans buffered after failed sends (GF-943)
+    await gf.flush()                  — drain queued + buffered spans (GF-943/GF-944)
     gf.set_eval_id(eval_id)           — sticky eval_id for the current async context (GF-727)
     async with gf.eval_scope(eval_id) — scoped eval_id with auto-restore (GF-727)
     gf.attrs                           — OTel GenAI span attribute constants (GF-735)
 """
 
+import asyncio
 import functools
 import logging
 import secrets
@@ -23,7 +24,7 @@ from ._buffer import drain as buffer_drain
 from ._buffer import push as buffer_push
 from ._buffer import size as buffer_size
 from ._context import _current_span_id, _current_trace_id, _eval_id, _run_id
-from ._exporter import send_span
+from ._exporter import close_client, send_batch, send_span
 from ._span import Span
 
 __all__ = ["init", "trace", "span", "flush", "set_eval_id", "eval_scope", "attrs"]
@@ -32,6 +33,55 @@ logger = logging.getLogger("ghostfactory")
 
 _endpoint: str | None = None
 _api_key: str | None = None
+
+# GF-944: batch queue state — lazy-created in _ensure_queue() (first async call).
+# NEVER created in init() (sync) — event loop may not exist yet.
+_pending_queue: "asyncio.Queue | None" = None
+_flush_task: "asyncio.Task | None" = None
+
+BATCH_SIZE = 50
+BATCH_TIMEOUT_S = 5.0
+
+
+async def _ensure_queue() -> asyncio.Queue:
+    global _pending_queue, _flush_task
+    if _pending_queue is None:
+        _pending_queue = asyncio.Queue()
+        _flush_task = asyncio.create_task(_flush_loop())
+    return _pending_queue
+
+
+async def _flush_loop() -> None:
+    """Background drain loop — sends batches of up to BATCH_SIZE every BATCH_TIMEOUT_S."""
+    while True:
+        batch = []
+        try:
+            deadline = asyncio.get_running_loop().time() + BATCH_TIMEOUT_S
+            while len(batch) < BATCH_SIZE:
+                remaining = deadline - asyncio.get_running_loop().time()
+                if remaining <= 0:
+                    break
+                try:
+                    item = await asyncio.wait_for(
+                        _pending_queue.get(), timeout=max(remaining, 0.001)
+                    )
+                    batch.append(item)
+                except asyncio.TimeoutError:
+                    break
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+
+        if batch:
+            ok = await send_batch(batch, _endpoint, _api_key)
+            if not ok:
+                for item in batch:
+                    buffer_push(item["span"])
+                logger.warning(
+                    "GF SDK: batch send failed — %d span(s) buffered",
+                    len(batch),
+                )
 
 
 def init(endpoint: str, api_key: str, run_id: str | None = None) -> str:
@@ -79,10 +129,11 @@ def trace(name: str, **kwargs: Any):
 
 @asynccontextmanager
 async def span(name: str, **attributes: Any):
-    """Async context manager. The parent is read from the ContextVar automatically.
+    """Async context manager. Enqueues spans for batched delivery (GF-944).
 
     On exception: status="error", error=str(e), then the exception propagates out.
-    A send failure → falls into the buffer (silent), does not raise.
+    A send failure → falls into the buffer (silent). Never raises to the caller.
+    Call gf.flush() to drain the queue immediately (e.g. before process exit).
     """
     if _endpoint is None or _api_key is None:
         raise RuntimeError("ghostfactory.init() must be called first")
@@ -118,45 +169,82 @@ async def span(name: str, **attributes: Any):
         s.ended_at = datetime.now(timezone.utc)
         _current_span_id.reset(span_token)
         _current_trace_id.reset(trace_token)
-        try:
-            sent = await send_span(s, _endpoint, _api_key)
-        except Exception:  # noqa: BLE001 — SDK never raises to caller
-            sent = False
-        if not sent:
-            buffer_push(s)
-            logger.warning(
-                "GF SDK: span %r failed to send — buffered for gf.flush() (%d buffered)",
-                s.name,
-                buffer_size(),
-            )
+        eval_id = _eval_id.get()
+        run_id_val = _run_id.get()
+        queue = await _ensure_queue()
+        await queue.put({"span": s, "run_id": run_id_val, "eval_id": eval_id})
 
 
 async def flush() -> int:
-    """Re-send spans buffered after failed sends (GF-943). Returns the sent count.
+    """Drain queued + buffered spans immediately. Returns the sent count.
 
-    Drains the buffer and re-sends each span individually; spans that still
-    fail go back into the buffer (order preserved among themselves). Send
-    failures never raise (SDK contract) — only calling before `init()` does.
+    1. Cancels the background flush loop.
+    2. Re-sends any previously buffered (failed) spans individually.
+    3. Sends all pending queue items as a batch.
+    4. Closes the HTTP client (recreated lazily on the next span).
+
+    Never raises on send failure (SDK contract). Only raises if called before init().
     """
     if _endpoint is None or _api_key is None:
         raise RuntimeError("ghostfactory.init() must be called first")
 
-    spans = buffer_drain()
+    global _pending_queue, _flush_task
+
+    # 1. Cancel background flush loop
+    if _flush_task is not None:
+        _flush_task.cancel()
+        try:
+            await _flush_task
+        except asyncio.CancelledError:
+            pass
+        _flush_task = None
+
+    # 2. Drain OLD failure buffer first — so queue failures below don't
+    #    get double-processed if they also end up in the buffer.
+    old_failed = buffer_drain()
+
+    # 3. Drain pending queue
+    queue_items = []
+    if _pending_queue is not None:
+        while not _pending_queue.empty():
+            queue_items.append(_pending_queue.get_nowait())
+        _pending_queue = None
+
     sent_count = 0
-    for s in spans:
+
+    # 4. Resend old buffer items individually (preserves retry semantics)
+    buffer_failed = 0
+    for s in old_failed:
         try:
             ok = await send_span(s, _endpoint, _api_key)
-        except Exception:  # noqa: BLE001 — SDK never raises to caller
+        except Exception:  # noqa: BLE001
             ok = False
         if ok:
             sent_count += 1
         else:
+            buffer_failed += 1
             buffer_push(s)
 
-    failed = len(spans) - sent_count
-    if failed:
+    if buffer_failed:
         logger.warning(
-            "GF SDK: flush() could not deliver %d span(s) — re-buffered for the next flush",
-            failed,
+            "GF SDK: flush() could not deliver %d span(s) — re-buffered for next flush",
+            buffer_failed,
         )
+
+    # 5. Send queue items as a batch (one HTTP call per run_id/eval_id group)
+    if queue_items:
+        ok = await send_batch(queue_items, _endpoint, _api_key)
+        if ok:
+            sent_count += len(queue_items)
+        else:
+            for item in queue_items:
+                buffer_push(item["span"])
+            logger.warning(
+                "GF SDK: flush() could not deliver %d span(s) — buffered for next flush",
+                len(queue_items),
+            )
+
+    # 6. Close the HTTP client (recreated lazily on the next span)
+    await close_client()
+
     return sent_count

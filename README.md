@@ -10,6 +10,11 @@
   <img src=".github/assets/badges.svg" alt="status · license · ingest · replay" width="620">
 </p>
 
+<p align="center">
+  <em>Tamper-evident audit trail for production AI agents. Append-only.<br>
+  Cryptographically verifiable. Deterministically replayable.</em>
+</p>
+
 ---
 
 Span Chain treats the **agent session** as the unit of analysis — not the individual LLM call.
@@ -36,6 +41,8 @@ SHA-256 chained to the previous action. Append-only. Offline verification via
 | **Replay** | Re-runs LLM ($) | Cassette replay ($0) |
 | **Evidence** | Logs | Cryptographic verification |
 | **Hosting** | Vendor SaaS | Self-hosted, MIT |
+| **Debug cost** | Every retry = LLM call | $0 from cassette replay |
+| **Architecture** | Stateless Python API | Elixir/OTP per-run isolation |
 
 **LangSmith** is built for development debugging and trace visualization.
 **Span Chain** is built for production auditability and tamper-evident evidence.
@@ -43,6 +50,9 @@ SHA-256 chained to the previous action. Append-only. Offline verification via
 **Langfuse** is built for tracing and analytics.
 **Span Chain** is built for cryptographic verification and deterministic
 replay without LLM calls.
+
+**Elixir/OTP per-run isolation** — each agent run gets its own supervised process;
+a crash in one run never affects another.
 
 If you are targeting EU AI Act compliance, Span Chain's tamper-evident
 ledger provides the tamper-evident audit trail that makes Article 12 traceability verifiable.
@@ -166,9 +176,93 @@ via standard OpenTelemetry (OTLP) — no framework-specific SDK required.
 
 ---
 
+## OTLP Compatibility
+
+Span Chain ingestuje **OTLP/HTTP JSON** (`POST /v1/traces`) — subset standardu.
+Full OTel drop-in compatibility není cílem L2; chybějící pole jsou ignorována
+beze stopy (`lossy-but-visible` per ADR-004).
+
+### Attribute value types
+
+| OTLP type     | Span Chain chování              |
+|---------------|---------------------------------|
+| `stringValue` | uložen jako string ✅           |
+| `intValue`    | uložen jako integer ✅          |
+| `boolValue`   | uložen jako boolean ✅          |
+| `doubleValue` | uložen jako float ✅            |
+| `arrayValue`  | JSON-stringified string ⚠️     |
+| `kvlistValue` | JSON-stringified string ⚠️     |
+
+### Required resource attribute
+
+`service.instance.id` **musí** být přítomno — mapuje se na `run_id`.
+Chybějící → HTTP 400 `missing_run_id`.
+
+```json
+{
+  "resourceSpans": [{
+    "resource": {
+      "attributes": [{
+        "key": "service.instance.id",
+        "value": { "stringValue": "my-agent-run-001" }
+      }]
+    },
+    ...
+  }]
+}
+```
+
+### Co se ignoruje
+
+- `events`, `links` — neuloženy
+- scope attributes — neuloženy (pouze resource + span attributes)
+- `traceState`, `droppedAttributesCount` — neuloženy
+
+### HTTP response
+
+Úspěšný ingest → HTTP **200** + `{"partialSuccess":{"rejectedSpans":0}}`.
+(Ne 202 — to vrací jen `/ingest` endpoint.)
+
+### OTel Collector bridge
+
+Máš standardní OTel SDK bez možnosti nastavit `service.instance.id`?
+Použij OTel Collector jako mezičlánek:
+
+```yaml
+# OTel Collector bridge → Span Chain
+# Mapuje service.name → service.instance.id (run_id carrier pro Span Chain)
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: "0.0.0.0:4318"
+
+processors:
+  transform/spanchain:
+    trace_statements:
+      - context: resource
+        statements:
+          - set(attributes["service.instance.id"], attributes["service.name"])
+
+exporters:
+  otlphttp/spanchain:
+    endpoint: "https://your-spanchain-instance/v1/traces"
+    headers:
+      Authorization: "Bearer ${env:GF_API_KEY}"
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [transform/spanchain]
+      exporters: [otlphttp/spanchain]
+```
+
+---
+
 ## SDKs
 
-Both SDKs ship in this repo and speak OTLP/HTTP JSON natively.
+Both SDKs ship in this repo and speak OTLP/HTTP JSON (subset — see [OTLP Compatibility](#otlp-compatibility)).
 
 **Python:**
 
@@ -192,6 +286,17 @@ Usage examples in [`sdk/python/README.md`](sdk/python/README.md) and
 v0.x · launched June 2026 · active development.
 
 A **[GhostFactory](https://ghostfactory.art)** product — [spanchain.art](https://spanchain.art)
+
+---
+
+## What is public
+
+By default, `/trail` and `/eval/:id` are accessible without authentication.
+These views expose metadata: run IDs, span names, timing, and agent config diffs
+(`gf.agent.*` attributes). **Span payloads remain token-gated** (`GF_API_KEY`).
+
+For internet-facing or shared instances, set `TRAIL_AUTH_ENABLED=true` in `.env`.
+This enables HTTP Basic Auth on Trail/Eval views (password = `GF_API_KEY`).
 
 ---
 

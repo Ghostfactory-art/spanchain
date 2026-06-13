@@ -369,7 +369,7 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
         "SHA-256 hash-chain tamper-evident audit trail",
         "Deterministic VCR replay without LLM calls",
         "Structural run comparison with deviation point detection",
-        "OpenTelemetry OTLP native",
+        "OpenTelemetry OTLP/HTTP ingest",
         "Python SDK",
         "TypeScript SDK",
         "Real-time LiveView trail",
@@ -418,7 +418,7 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
           "name": "Does Span Chain support OpenTelemetry?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. Span Chain is OpenTelemetry (OTLP/HTTP) native. Engineers can connect any OTel-compatible client, including the official Span Chain Python and TypeScript SDKs, without proprietary vendor lock-in."
+            "text": "Yes. Span Chain accepts OpenTelemetry (OTLP/HTTP) — partial standard subset. Engineers can connect any OTel-compatible client, including the official Span Chain Python and TypeScript SDKs, without proprietary vendor lock-in."
           }
         },
         {
@@ -467,7 +467,7 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
     <div class="grp">
       <span class="seal">Span Chain by GhostFactory</span>
       <span>MIT License</span>
-      <span>OTLP native</span>
+      <span>OTLP/HTTP ingest</span>
       <span>Elixir / OTP</span>
       <span>Python + TypeScript SDK</span>
     </div>
@@ -511,11 +511,6 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
         every LLM call, every decision, every tool call captured in a tamper-evident, append-only chain.
         Cryptographically verifiable. Deterministically replayable without LLM calls.
       </p>
-      <ul class="hero-bullets">
-        <li>Cryptographic receipts for every action</li>
-        <li>Offline verification via <code>verify_ledger</code></li>
-        <li>Works with LangChain · CrewAI · LlamaIndex via OTLP</li>
-      </ul>
     </div>
 
     <div class="hero-grid">
@@ -687,7 +682,7 @@ docker compose up</pre>
 <div class="ticker">
   <div class="ticker-row">
     <span><b>MIT License</b></span><span class="sep">·</span>
-    <span class="red">OTLP native</span><span class="sep">·</span>
+    <span class="red">OTLP/HTTP ingest</span><span class="sep">·</span>
     <span>SHA-256 hash-chain</span><span class="sep">·</span>
     <span class="blue">append-only</span><span class="sep">·</span>
     <span><b>verify_ledger</b></span><span class="sep">·</span>
@@ -700,7 +695,7 @@ docker compose up</pre>
     <span class="red">$0 debug cost</span><span class="sep">·</span>
     <span>open source</span><span class="sep">·</span>
     <span><b>MIT License</b></span><span class="sep">·</span>
-    <span class="red">OTLP native</span><span class="sep">·</span>
+    <span class="red">OTLP/HTTP ingest</span><span class="sep">·</span>
     <span>SHA-256 hash-chain</span><span class="sep">·</span>
     <span class="blue">append-only</span><span class="sep">·</span>
     <span><b>verify_ledger</b></span><span class="sep">·</span>
@@ -744,7 +739,7 @@ docker compose up</pre>
       </article>
       <article class="rec">
         <div class="topline"><span>Entry · <b>04</b></span><span class="doss-stamp-mini">Standard</span></div>
-        <h3>OTLP native</h3>
+        <h3>OTLP/HTTP ingest</h3>
         <p class="desc">OpenTelemetry protocol. Python SDK + TypeScript SDK. Connect any OTel-compatible client — no proprietary SDK lock-in.</p>
       </article>
       <article class="rec">
@@ -936,7 +931,7 @@ docker compose up</pre>
           <div class="num">08</div>
           <h5>trace_id</h5>
           <div class="role-t">W3C OTel compat</div>
-          <p class="body-t">128-bit identifier. Joins your existing distributed tracing. OTLP native — no SDK rewrites.</p>
+          <p class="body-t">128-bit identifier. Joins your existing distributed tracing. OTLP/HTTP ingest — no SDK rewrites.</p>
           <div class="measure"><span>w <b>128 bit</b></span><span>std <b>W3C</b></span></div>
         </div>
       </div>
@@ -1206,7 +1201,7 @@ docker compose up</pre>
     <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Yes. Span Chain records a VCR-style cassette of every agent run. Debug replay is deterministic and costs $0 — zero live LLM calls and zero API credits. Engineers can compare the replayed span tree against a baseline to identify the exact point of deviation during model upgrades.</p>
 
     <h3 style="margin-top:2rem;margin-bottom:.5rem">Does Span Chain support OpenTelemetry?</h3>
-    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Yes. Span Chain is OpenTelemetry (OTLP/HTTP) native. Engineers can connect any OTel-compatible client, including the official Span Chain Python and TypeScript SDKs, without proprietary vendor lock-in.</p>
+    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Yes. Span Chain accepts OpenTelemetry (OTLP/HTTP) — partial standard subset. Engineers can connect any OTel-compatible client, including the official Span Chain Python and TypeScript SDKs, without proprietary vendor lock-in.</p>
 
     <h3 style="margin-top:2rem;margin-bottom:.5rem">How do I self-host Span Chain?</h3>
     <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Span Chain is self-hosted with Docker Compose: clone the GitHub repository (<code>ghostfactory-art/spanchain</code>), copy <code>.env.example</code> to <code>.env</code>, and run <code>docker compose up</code>. The core is MIT licensed. There are no usage limits, no external vendor dependencies, and no trace data leaves the user's infrastructure.</p>

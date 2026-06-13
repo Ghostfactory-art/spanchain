@@ -40,6 +40,30 @@ from ._span import Span, _iso_z
 
 logger = logging.getLogger("ghostfactory")
 
+# GF-944: persistent client singleton — lazy-created on first async call.
+# Never created in gf.init() (sync) — would RuntimeError if the event loop
+# hadn't started yet.
+_http_client: "httpx.AsyncClient | None" = None
+
+
+async def _get_client() -> httpx.AsyncClient:
+    """Lazy singleton HTTP client. Only ever called from async context."""
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(
+            timeout=10.0,
+            limits=httpx.Limits(max_connections=50),
+        )
+    return _http_client
+
+
+async def close_client() -> None:
+    """Close the persistent client and reset to None. Called by gf.flush()."""
+    global _http_client
+    if _http_client is not None:
+        await _http_client.aclose()
+        _http_client = None
+
 
 def _iso_to_ns(iso_str: str) -> int:
     """ISO 8601 string → Unix nanoseconds (int).
@@ -151,17 +175,52 @@ async def send_span(span: Span, endpoint: str, api_key: str) -> bool:
         "Content-Type": "application/json",
     }
     url = f"{endpoint.rstrip('/')}/v1/traces"
+    client = await _get_client()  # GF-944: reuse persistent client
 
     for attempt in range(2):  # 0 = first try, 1 = retry
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                r = await client.post(url, json=payload, headers=headers)
-                if 200 <= r.status_code < 300:
-                    return True
-                logger.debug(
-                    "GF SDK: unexpected status %s (attempt %d)", r.status_code, attempt
-                )
+            r = await client.post(url, json=payload, headers=headers)
+            if 200 <= r.status_code < 300:
+                return True
+            logger.debug(
+                "GF SDK: unexpected status %s (attempt %d)", r.status_code, attempt
+            )
         except Exception as e:  # noqa: BLE001 — silent drop is the contract
             logger.debug("GF SDK: send failed (attempt %d): %s", attempt, e)
 
     return False
+
+
+async def send_batch(items: list[dict], endpoint: str, api_key: str) -> bool:
+    """POST a batch of queued span items in one HTTP call per (run_id, eval_id) group.
+
+    Each item is a dict: {"span": Span, "run_id": str, "eval_id": str | None}.
+    Groups spans by (run_id, eval_id) so a single request covers the whole batch.
+    Returns True if all groups sent successfully, False if any failed.
+    Never raises — SDK contract.
+    """
+    groups: dict[tuple, list[Span]] = {}
+    for item in items:
+        key = (item["run_id"], item.get("eval_id"))
+        groups.setdefault(key, []).append(item["span"])
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    url = f"{endpoint.rstrip('/')}/v1/traces"
+    client = await _get_client()
+
+    all_ok = True
+    for (run_id, eval_id), spans in groups.items():
+        payload = _build_otlp_payload(spans, run_id=run_id, eval_id=eval_id)
+        try:
+            r = await client.post(url, json=payload, headers=headers)
+            if not (200 <= r.status_code < 300):
+                logger.debug("GF SDK: batch send got status %s", r.status_code)
+                all_ok = False
+        except Exception as e:  # noqa: BLE001
+            logger.debug("GF SDK: batch send failed (%d spans): %s", len(spans), e)
+            all_ok = False
+
+    return all_ok

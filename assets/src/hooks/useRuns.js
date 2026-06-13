@@ -21,6 +21,8 @@ export function loadRuns({ setRuns, setError, setLoading, onUnauthorized, signal
     .finally(() => { if (!signal?.aborted) setLoading(false); }); // no setState post-unmount (GF-829)
 }
 
+const POLL_INTERVAL_MS = 3000;
+
 export function useRuns() {
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(() => !!localStorage.getItem('gf_token'));
@@ -39,9 +41,30 @@ export function useRuns() {
     if (!localStorage.getItem('gf_token')) return; // loading already false from init → nothing to clear
     return loadRuns({ setRuns, setError, setLoading, onUnauthorized, signal: nextSignal(abortRef) });
   }, [onUnauthorized]);
+  // GF-856 — recursive setTimeout polling so Trail updates without F5 after OTLP ingest.
+  // setTimeout (not setInterval) ensures the next tick never fires before the previous fetch settles.
+  // Promise.resolve() wrapper is void-safe: .finally() runs whether retry() returns a Promise or void.
   useEffect(() => {
-    retry();
-    return () => abortRef.current?.abort(); // GF-829 — unmount (and retry-change) aborts the in-flight fetch
+    let timeoutId;
+    let cancelled = false;
+
+    const poll = () => {
+      if (cancelled) return;
+      Promise.resolve(retry()).finally(() => {
+        if (!cancelled) {
+          timeoutId = setTimeout(poll, POLL_INTERVAL_MS);
+        }
+      });
+    };
+
+    retry();                                          // mount load (existing behavior)
+    timeoutId = setTimeout(poll, POLL_INTERVAL_MS);  // first poll tick after 3 s
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      abortRef.current?.abort();                     // GF-829 — unmount aborts in-flight fetch
+    };
   }, [retry]);
 
   return { runs, loading, error, retry };

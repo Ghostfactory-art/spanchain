@@ -350,8 +350,12 @@ defmodule SpanChain.Ingestion.RouterTest do
 
       conn = post_otlp(body)
       assert conn.status == 400
-      assert {:ok, %{"error" => err}} = Jason.decode(conn.resp_body)
-      assert err =~ "service.instance.id"
+
+      assert {:ok, %{"error" => "missing_run_id", "hint" => hint, "message" => msg}} =
+               Jason.decode(conn.resp_body)
+
+      assert hint =~ "OTel"
+      assert msg =~ "service.instance.id"
     end
 
     test "without Bearer token returns 401 (AuthPlug applies)" do
