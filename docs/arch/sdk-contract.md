@@ -32,10 +32,32 @@ and `TaskGroup` each see their own task's eval_id without contamination.
 | `span.attributes` + `status`/`error` merged | `attributes` — GF-742 type dispatch: `intValue` / `boolValue` / `doubleValue` / `stringValue` fallback (bool checked BEFORE int — `isinstance(True, int) is True`) |
 | `eval_id` (optional) | `resource.attributes["gf.eval_id"]` — explicit param > ContextVar > None resolution in `_build_otlp_payload` (GF-727) |
 
-**Send model**: per-span on context exit (`__init__.py` `span/2` finally
-block). No buffering on the normal path — `await send_span(...)` immediately after
-`__aexit__`. If a send fails → `buffer_push(s)` (in-memory deque, max 1000).
-Send-path failures are a silent debug log; the SDK **NEVER raises** to the caller.
+**Send model**: batched via `asyncio.Queue` (GF-944). Spans are enqueued on
+context exit (`__init__.py`, `queue.put`); a background `_flush_loop` drains them
+in batches (`BATCH_SIZE = 50` or every `BATCH_TIMEOUT_S = 5.0`). If a send fails →
+`buffer_push(s)` (in-memory deque, max 1000). Send-path failures are a silent debug
+log; the SDK **NEVER raises** to the caller.
+
+**Shutdown přes `flush()`** (`__init__.py:178`): explicitní drain před koncem procesu
+(`await gf.flush()`). Sekvence (přesně dle kódu):
+
+1. **Guard** — pokud `init()` neproběhl (`_endpoint`/`_api_key` je `None`), vyhodí `RuntimeError`;
+   jinak SDK nikdy neraisuje.
+2. **Zruší background `_flush_loop`** — `_flush_task.cancel()` + `await` (spolkne `CancelledError`),
+   `_flush_task = None`. Proč: aby smyčka souběžně neodebírala z `_pending_queue`, zatímco ji drainujeme.
+3. **Vyprázdní failure buffer** — `buffer_drain()` přesune obsah deque do `old_failed`. Proč jako první:
+   aby spany, které selžou při batch sendu níže (a vrátí se do bufferu), nebyly v témž `flush()`
+   zpracovány dvakrát.
+4. **Vyprázdní pending `_pending_queue`** — `get_nowait()` do `queue_items`, pak `_pending_queue = None`.
+5. **Přepošle staré buffer položky jednotlivě** přes `send_span()` (zachová per-item retry sémantiku);
+   neúspěch → `buffer_push()` zpět + warning.
+6. **Odešle queue položky jako batch** přes `send_batch()` (jedno HTTP volání per run_id/eval_id skupina);
+   při selhání se každý span re-bufferuje + warning.
+7. **Uzavře httpx klienta** přes `close_client()` (`await _http_client.aclose()` + reset na `None`;
+   znovu se vytvoří líně při dalším spanu).
+
+Po `flush()` nezbývají žádné pending background tasky (`_flush_task = None`) ani otevřené httpx
+sessions (`close_client()` provedl `aclose()`). `flush()` vrací počet odeslaných spanů.
 
 **`attrs` module** (GF-735, GF-738, GF-736, GF-737): `gen_ai.*` OTel GenAI
 semantic convention constants (input_tokens, output_tokens, request.model,
@@ -55,16 +77,17 @@ link with semantic context) + the `hash_prompt` utility (SHA-256[:16]).
 gf.init({endpoint, apiKey, runId, evalId?})
 gf.span(name, attrs, async () => {...})           // higher-order, returns fn result
 gf.trace(name)(fn)                                // higher-order decorator
-gf.setEvalId(id)                                  // ⚠ module-level (GF-733 to fix)
+gf.evalScope(id, fn)                              // per-task isolated via ALS (GF-733 resolved)
 await gf.flush()                                  // explicit drain before exit
 gf.shutdown()
 import { attrs } from "@ghostfactory/sdk"         // GF-735 / GF-738 constants
 ```
 
 **Context**: `AsyncLocalStorage` from `node:async_hooks` — the Node equivalent of
-ContextVar. Per-task isolated FOR the span hierarchy; `setEvalId`, however, writes to
-module-level config (GF-733 tracked — parallel `Promise.all` runs see
-last-writer-wins for eval_id).
+ContextVar. Per-task isolated for both the span hierarchy and eval_id: `evalScope(id, fn)`
+runs `fn` under a second `AsyncLocalStorage` (`runWithEvalId`, `context.ts:25,33`).
+GF-733 resolved — parallel `Promise.all([evalScope("A", …), evalScope("B", …)])` runs
+each see their own eval_id (no more last-writer-wins).
 
 **Where it sends**: `POST {endpoint}/v1/traces` with an **OTLP/HTTP JSON** payload
 (`resourceSpans` shape per the OTel spec). The TS SDK is a "standard-OTel front door" —

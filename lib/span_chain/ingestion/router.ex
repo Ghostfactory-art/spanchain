@@ -4,6 +4,8 @@ defmodule SpanChain.Ingestion.Router do
   use Plug.Router
   require Logger
 
+  alias SpanChain.Evals
+
   alias SpanChain.Ingestion.{
     AuthPlug,
     OtlpTranslator,
@@ -103,8 +105,15 @@ defmodule SpanChain.Ingestion.Router do
         # validate the run_id from resource.attributes["service.instance.id"] here,
         # with the same regex as /ingest. Malformed (path traversal / >128 / disallowed
         # characters) → reject the WHOLE request (no partial ingest of an injection attempt).
-        if Enum.all?(groups, fn {run_id, _ev, _spans} -> ValidationPlug.valid_run_id?(run_id) end) do
-          # GF-706: groups is a 3-tuple {run_id, eval_id_or_nil, spans}.
+        if Enum.all?(groups, fn {run_id, _ev, _name, _spans} ->
+             ValidationPlug.valid_run_id?(run_id)
+           end) do
+          # GF-868: persist resource-level eval names (best-effort, must not affect ingest).
+          Enum.each(groups, fn {_run_id, eval_id, eval_name, _spans} ->
+            if eval_id, do: Evals.ensure_eval_name(eval_id, eval_name)
+          end)
+
+          # GF-706/GF-868: groups is a 4-tuple {run_id, eval_id_or_nil, eval_name_or_nil, spans}.
           # GF-727: eval_id goes into the SGS both via ensure_session opts (for the spawn
           # path, init/1 persists it) AND via ingest_spans/3 opts (for an
           # already-running SGS — late-binding in handle_call). Without the second path
@@ -115,7 +124,8 @@ defmodule SpanChain.Ingestion.Router do
           # in ensure_session), log + continue instead of a bare-match MatchError → 500, which
           # silently dropped spans from the remaining groups. rejectedSpans carries the real count.
           {accepted_ids, accepted_spans, rejected_spans} =
-            Enum.reduce(groups, {[], 0, 0}, fn {run_id, eval_id, spans}, {ids, acc, rej} ->
+            Enum.reduce(groups, {[], 0, 0}, fn {run_id, eval_id, _eval_name, spans},
+                                               {ids, acc, rej} ->
               with {:ok, _pid} <- SessionSupervisor.ensure_session(run_id, eval_id: eval_id),
                    {:ok, _count} <- SessionGenServer.ingest_spans(run_id, spans, eval_id: eval_id) do
                 {[run_id | ids], acc + length(spans), rej}

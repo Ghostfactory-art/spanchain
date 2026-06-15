@@ -9,7 +9,7 @@ Use case: "same question, 3 different models → which is best?"
 
 **Data model**:
 - `evals` table (`eval.ex`): `eval_id` PK, `name`, `description`, `status`
-- `runs.eval_id` FK (`run.ex:26`): nullable, belongs_to Eval with `references: :eval_id`
+- `runs.eval_id` FK (`run.ex:38`): nullable, belongs_to Eval with `references: :eval_id`
 
 **How `gf.eval_id` arrives via OTLP**:
 
@@ -34,7 +34,7 @@ resource attrs or GF-727 late-binding via `ingest_spans/3` opts) lives
 in `state.eval_id` and `append_span/2` attaches it to the entry as an in-memory
 `:eval_id` sidecar (NOT a Ledger schema field).
 
-**Pipeline.handle_batch/4** (`pipeline.ex:72-130`) then:
+**Pipeline.handle_batch/4** (`pipeline.ex:101-130`) then:
 
 ```
 ensure_run_records(entries)
@@ -73,13 +73,13 @@ Repo.all as the only side effect (deterministic for a given DB snapshot)."
 
 **Algorithm**:
 1. `load_run(run_id)` (`comparator.ex:51-66`) — fetch Ledger rows ORDER BY epoch_id, seq + `build_tree`.
-2. `build_tree/1` (`comparator.ex:69-79`) — group by `parent_span_id`, attach recursively. Identical algorithm to `TrailLive.build_tree/1` (`trail_live.ex:298-307`); the copied comment in Comparator admits it.
-3. `pair_by_name/2` (`comparator.ex:159-183`) — for each name, pair the i-th A with the i-th B (sibling position). `Enum.uniq` on the keys preserves insertion order for a stable `deviation_point`.
+2. `build_tree/1` (`comparator.ex:69-79`) — group by `parent_span_id`, attach recursively. Near-identical to `TrailLive.build_tree/1` (`trail_live.ex:300-310`); the copied comment in Comparator admits it. **Divergence**: Comparator's `attach/2` falls back to the row column (`get_in(payload, ["span_id"]) || row.span_id`), where TrailLive uses only the payload value.
+3. `pair_by_name/2` (`comparator.ex:208-232`) — for each name, pair the i-th A with the i-th B (sibling position). `Enum.uniq` on the keys preserves insertion order for a stable `deviation_point`.
 4. Generating diff entries:
    - `{:only_a, node}` → `"span_removed"`
    - `{:only_b, node}` → `"span_added"`
    - `{:both, a, b}` → `duration_diff_entry` (>20% threshold in `@duration_threshold` on line 28) + recurse children
-5. `mark_deviation_points/1` (`comparator.ex:234-237`) — called per top-level branch inside `diff_trees/2` (`comparator.ex:153` flat_map), marks the first diff entry in the argument list. The per-branch behavior comes from the call site; GF-740 (Sprint 7, commit `aabb26b`) fixed it from the pre-GF-740 global-index-0 behavior.
+5. `mark_deviation_points/1` (`comparator.ex:240-245`) — called per top-level branch inside `diff_trees/2` (`comparator.ex:153` flat_map), marks the first diff entry in the argument list. The per-branch behavior comes from the call site; GF-740 (Sprint 7, commit `aabb26b`) fixed it from the pre-GF-740 global-index-0 behavior.
 
 **Edge cases**:
 - Both `eval_id` nil → `:ok` (OK to compare unassigned runs)
@@ -87,7 +87,7 @@ Repo.all as the only side effect (deterministic for a given DB snapshot)."
 - A.eval_id = "x", B.eval_id = "y" → `{:error, :different_eval}` (`comparator.ex:85-87`)
 - Run does not exist → `{:error, :run_not_found}` (`comparator.ex:52-53`)
 
-**Duration computation** (`comparator.ex:209-234`): **payload first**, projection
+**Duration computation** (`comparator.ex:259-284`): **payload first**, projection
 fallback. The GF-669 projection columns `started_at`/`ended_at` are truncated to
 `:second` (`ledger.ex:117`), so sub-second durations give 0. The payload keeps
 ISO8601 strings with ms precision. Lesson learned from GF-706.
@@ -104,7 +104,7 @@ ISO8601 strings with ms precision. Lesson learned from GF-706.
 2. Insert `%Cassette{}` with `snapshot: [payload, payload, ...]` (array of maps).
 3. PAYLOAD-FIRST: we store the raw `payload` map, NOT the projection columns. (Lesson from the GF-706 sub-second precision bug.)
 
-`Cassettes.Replayer.replay/2` (`replayer.ex:31-59`) — a **pure module**, not a GenServer:
+`Cassettes.Replayer.replay/2` (`replayer.ex:33-64`) — a **pure module**, not a GenServer:
 1. Subscribe to `"run:#{new_run_id}"` **BEFORE** ingest (otherwise you lose the first broadcasts).
 2. `SessionSupervisor.ensure_session(new_run_id)` + `SGS.ingest_spans(new_run_id, spans)`.
 3. **Multi-batch wait** — receive loop `{:spans_flushed, ^run_id}` + count check (`wait_for_all_spans/3`). A cassette with N spans emits `ceil(N/50)` broadcasts; the replay must not return after the first.

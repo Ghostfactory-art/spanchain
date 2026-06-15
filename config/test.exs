@@ -46,7 +46,10 @@ config :span_chain,
   stuck_stale_threshold_s: 1,
   # GF-788: LedgerVerifier starts but never auto-sweeps; tests call sweep_now/0 directly.
   verify_sweep_interval_ms: :infinity,
-  verify_since_minutes: 1
+  verify_since_minutes: 1,
+  # GF-1009: do_sweep runs in a Task in prod (:async). Tests run :sync so the sweep stays in the
+  # GenServer process, which holds the allowed Sandbox checkout (a Task PID would not inherit it).
+  sweep_call_mode: :sync
 
 config :span_chain, SpanChain.Web.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4003],

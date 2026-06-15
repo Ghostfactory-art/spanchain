@@ -91,6 +91,27 @@ defmodule SpanChain.Ingestion.RouterTest do
     }
   end
 
+  # GF-868: OTLP body with gf.eval_id + (optional) gf.eval.name resource attributes.
+  defp otlp_eval_body(run_id, eval_id, eval_name) do
+    attrs =
+      [
+        %{"key" => "service.instance.id", "value" => %{"stringValue" => run_id}},
+        %{"key" => "gf.eval_id", "value" => %{"stringValue" => eval_id}}
+      ] ++
+        if eval_name,
+          do: [%{"key" => "gf.eval.name", "value" => %{"stringValue" => eval_name}}],
+          else: []
+
+    %{
+      "resourceSpans" => [
+        %{
+          "resource" => %{"attributes" => attrs},
+          "scopeSpans" => [%{"spans" => [%{"name" => "llm_call"}]}]
+        }
+      ]
+    }
+  end
+
   test "POST /ingest with valid payload returns 202" do
     body = %{
       "run_id" => "router-test-1",
@@ -396,6 +417,28 @@ defmodule SpanChain.Ingestion.RouterTest do
 
       assert_receive {:spans_flushed, ^run_a}, 5_000
       assert_receive {:spans_flushed, ^run_b}, 5_000
+    end
+
+    # GF-868: gf.eval.name resource attribute → persisted as evals.name (synchronous at
+    # the OTLP boundary via Evals.ensure_eval_name; no Broadway flush wait needed).
+    test "POST /v1/traces with gf.eval.name → eval record name is the human label" do
+      body = otlp_eval_body("eval-name-run", "eval-868", "Benchmark: GPT-4o vs Sonnet")
+
+      conn = post_otlp(body)
+      assert conn.status == 200
+
+      assert SpanChain.Repo.get_by(SpanChain.Eval, eval_id: "eval-868").name ==
+               "Benchmark: GPT-4o vs Sonnet"
+    end
+
+    test "POST /v1/traces without gf.eval.name → eval record name falls back to eval_id" do
+      body = otlp_eval_body("eval-fallback-run", "eval-868-nofallback", nil)
+
+      conn = post_otlp(body)
+      assert conn.status == 200
+
+      assert SpanChain.Repo.get_by(SpanChain.Eval, eval_id: "eval-868-nofallback").name ==
+               "eval-868-nofallback"
     end
   end
 

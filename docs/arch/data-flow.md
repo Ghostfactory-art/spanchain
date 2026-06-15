@@ -17,7 +17,7 @@
 5.  validate/1                (router.ex:107-118)
         │  {:ok, run_id, spans} | {:error, :invalid_*}
         │
-6.  SessionSupervisor.ensure_session(run_id, opts)   (session_supervisor.ex:26-34)
+6.  SessionSupervisor.ensure_session(run_id, opts)   (session_supervisor.ex:44-52)
         │  Registry.lookup → existing pid? return.
         │  otherwise spawn_session/2 → DynamicSupervisor.start_child
         │  → SessionGenServer.init/1:
@@ -28,7 +28,7 @@
 7.  SessionGenServer.ingest_spans(run_id, spans)    (session_gen_server.ex:80-86)
         │  GenServer.call → mailbox FIFO → handle_call({:ingest_spans, spans})
         │
-8.  build_entries/2          (session_gen_server.ex:138-149)
+8.  build_entries/2          (session_gen_server.ex:162-173)
         │  Enum.reduce over spans:
         │    Ledger.build_entry/7 — compute_hash + entry map
         │    append_span/2 attaches state.eval_id to the entry as an in-memory `:eval_id`
@@ -53,19 +53,20 @@
         │  Producer waits for handle_demand from Processor
         │  Processor pulls up to N (batch_size), Batcher accumulates by size/timeout
         │
-13. Pipeline.handle_batch(:default, messages, _, _)  (pipeline.ex:72-130)
+13. Pipeline.handle_batch(:default, messages, _, _)  (pipeline.ex:101-130)
         │  entries = Enum.map(messages, & &1.data)
         │  (GF-751/GF-746 metadata phase — BEFORE the ledger insert, defensive rescue):
         │    ensure_run_records(entries)     # Repo.insert_all "runs"  on_conflict :nothing
         │    ensure_eval_records(entries)    # Repo.insert_all "evals" + COALESCE update runs.eval_id
         │    upsert_agent_configs(entries)   # GF-748 gf.agent.* projection
         │  ledger_entries = Enum.map(entries, &Map.delete(&1, :eval_id))  # strip SGS sidecar
-        │  with_retry/3 (private, pipeline.ex:197-224):
+        │  with_retry/3 (private, pipeline.ex:461-487):
         │    Repo.transaction(fn -> ledger_mod.insert_batch(ledger_entries) end)
         │    on raise → catch → {:error, reason} → retry up to 3× exp backoff (500/1000/2000 ms prod, 1ms test)
         │
 14a. Success path
-        │  broadcast_flushed/1 (pipeline.ex:114-119) — CALLED LAST (after metadata + ledger commit)
+        │  broadcast_flushed/1 (pipeline.ex:133, defp :159) — PubSub notify after metadata + ledger commit
+        │  (then broadcast_epoch_flushed/1 :136 — GF-775 crash-recovery drain signal, the actual last call)
         │    Phoenix.PubSub.broadcast → "run:#{run_id}" → {:spans_flushed, run_id}
         │    Phoenix.PubSub.broadcast → "runs"         → {:run_updated,  run_id}
         │  TrailLive.handle_info/2 re-fetches view (trail_live.ex:64-78)

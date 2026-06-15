@@ -39,15 +39,36 @@ defmodule SpanChain.LedgerVerifier do
 
   @impl true
   def handle_info(:sweep, state) do
-    do_sweep()
+    # GF-1009: do_sweep/0 can block the loop 6–12 s (200 runs × 30–60 ms SHA-256 verify).
+    # Run it off the GenServer loop. Fire-and-forget: at the prod interval (minutes) vs.
+    # sweep duration (seconds) overlapping sweeps can't occur; if the interval were ever
+    # dropped below the duration, a sweep_running? guard would be needed (out of scope).
+    Task.start(fn -> do_sweep() end)
     if state.interval != :infinity, do: schedule_sweep(state.interval)
     {:noreply, state}
   end
 
   @impl true
-  def handle_call(:sweep_now, _from, state) do
-    result = do_sweep()
-    {:reply, result, state}
+  def handle_call(:sweep_now, from, state) do
+    # GF-1009: :async (prod default) runs do_sweep/0 in a Task so the loop stays responsive,
+    # replying to the caller from the Task once the sweep finishes. :sync (test seam) keeps the
+    # sweep in the GenServer process, which holds the allowed Ecto Sandbox checkout (a Task is a
+    # new PID and would not inherit it).
+    case Application.get_env(:span_chain, :sweep_call_mode, :async) do
+      :sync ->
+        {:reply, do_sweep(), state}
+
+      :async ->
+        # Trade-off: if the Task crashes before it replies the caller hangs forever (no reply-side
+        # timeout). Acceptable for a fire-and-forget diagnostic sweep; full robustness would need
+        # Task.Supervisor + monitoring (out of scope).
+        Task.start(fn ->
+          result = do_sweep()
+          GenServer.reply(from, result)
+        end)
+
+        {:noreply, state}
+    end
   end
 
   # --- Private ---

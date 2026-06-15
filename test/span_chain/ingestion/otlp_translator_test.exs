@@ -38,8 +38,8 @@ defmodule SpanChain.Ingestion.OtlpTranslatorTest do
   describe "translate/1" do
     test "happy path — valid ResourceSpans returns grouped run_id + nil eval_id + span list" do
       body = valid_otlp_request("run-x")
-      # GF-706: 3-tuple {run_id, eval_id_or_nil, spans}. eval_id nil when gf.eval_id missing.
-      assert {:ok, [{"run-x", nil, [span]}]} = OtlpTranslator.translate(body)
+      # GF-706/GF-868: 4-tuple {run_id, eval_id_or_nil, eval_name_or_nil, spans}.
+      assert {:ok, [{"run-x", nil, nil, [span]}]} = OtlpTranslator.translate(body)
 
       assert span["trace_id"] == "abc123def456"
       assert span["span_id"] == "0123456789ab"
@@ -65,7 +65,30 @@ defmodule SpanChain.Ingestion.OtlpTranslatorTest do
         ]
       }
 
-      assert {:ok, [{"run-z", "eval-abc", [_]}]} = OtlpTranslator.translate(body)
+      assert {:ok, [{"run-z", "eval-abc", nil, [_]}]} = OtlpTranslator.translate(body)
+    end
+
+    test "GF-868: extract gf.eval.name from resource attributes when present" do
+      body = %{
+        "resourceSpans" => [
+          %{
+            "resource" => %{
+              "attributes" => [
+                %{"key" => "service.instance.id", "value" => %{"stringValue" => "run-n"}},
+                %{"key" => "gf.eval_id", "value" => %{"stringValue" => "eval-n"}},
+                %{
+                  "key" => "gf.eval.name",
+                  "value" => %{"stringValue" => "Benchmark: GPT-4o vs Sonnet"}
+                }
+              ]
+            },
+            "scopeSpans" => [%{"spans" => [%{"name" => "x"}]}]
+          }
+        ]
+      }
+
+      assert {:ok, [{"run-n", "eval-n", "Benchmark: GPT-4o vs Sonnet", [_]}]} =
+               OtlpTranslator.translate(body)
     end
 
     test "missing service.instance.id returns {:error, :missing_run_id}" do
@@ -92,7 +115,7 @@ defmodule SpanChain.Ingestion.OtlpTranslatorTest do
       # :nanosecond unit (the truncated '456' nanoseconds are L2 acceptable).
       body = valid_otlp_request("ns-test", %{"startTimeUnixNano" => "1716000000000123456"})
 
-      assert {:ok, [{"ns-test", nil, [span]}]} = OtlpTranslator.translate(body)
+      assert {:ok, [{"ns-test", nil, nil, [span]}]} = OtlpTranslator.translate(body)
       assert span["started_at"] == "2024-05-18T02:40:00.000123Z"
     end
 
@@ -121,8 +144,8 @@ defmodule SpanChain.Ingestion.OtlpTranslatorTest do
       assert {:ok, groups} = OtlpTranslator.translate(body)
 
       assert [
-               {"run-a", nil, [%{"name" => "span-a-1"}]},
-               {"run-b", nil, [%{"name" => "span-b-1"}, %{"name" => "span-b-2"}]}
+               {"run-a", nil, nil, [%{"name" => "span-a-1"}]},
+               {"run-b", nil, nil, [%{"name" => "span-b-1"}, %{"name" => "span-b-2"}]}
              ] = groups
     end
 
@@ -137,7 +160,7 @@ defmodule SpanChain.Ingestion.OtlpTranslatorTest do
           ]
         })
 
-      assert {:ok, [{"attr-test", nil, [span]}]} = OtlpTranslator.translate(body)
+      assert {:ok, [{"attr-test", nil, nil, [span]}]} = OtlpTranslator.translate(body)
       assert span["attributes"] == %{"s" => "hello", "n" => 42, "b" => true, "d" => 3.14}
     end
 
@@ -149,7 +172,7 @@ defmodule SpanChain.Ingestion.OtlpTranslatorTest do
           ]
         })
 
-      assert {:ok, [{"double-test", nil, [span]}]} = OtlpTranslator.translate(body)
+      assert {:ok, [{"double-test", nil, nil, [span]}]} = OtlpTranslator.translate(body)
       assert span["attributes"] == %{"cost_usd" => 0.00096}
       assert is_float(span["attributes"]["cost_usd"])
     end
@@ -163,7 +186,7 @@ defmodule SpanChain.Ingestion.OtlpTranslatorTest do
           ]
         })
 
-      assert {:ok, [{"double-int", nil, [span]}]} = OtlpTranslator.translate(body)
+      assert {:ok, [{"double-int", nil, nil, [span]}]} = OtlpTranslator.translate(body)
       assert span["attributes"]["temperature"] == 0
     end
 
@@ -185,7 +208,7 @@ defmodule SpanChain.Ingestion.OtlpTranslatorTest do
           ]
         })
 
-      assert {:ok, [{"arr-test", nil, [span]}]} = OtlpTranslator.translate(body)
+      assert {:ok, [{"arr-test", nil, nil, [span]}]} = OtlpTranslator.translate(body)
       assert is_binary(span["attributes"]["my_list"])
       refute is_nil(span["attributes"]["my_list"])
       assert {:ok, _} = Jason.decode(span["attributes"]["my_list"])
@@ -208,7 +231,7 @@ defmodule SpanChain.Ingestion.OtlpTranslatorTest do
           ]
         })
 
-      assert {:ok, [{"kv-test", nil, [span]}]} = OtlpTranslator.translate(body)
+      assert {:ok, [{"kv-test", nil, nil, [span]}]} = OtlpTranslator.translate(body)
       assert is_binary(span["attributes"]["my_map"])
       assert {:ok, _} = Jason.decode(span["attributes"]["my_map"])
     end
@@ -230,7 +253,7 @@ defmodule SpanChain.Ingestion.OtlpTranslatorTest do
           ]
         })
 
-      assert {:ok, [{"nested-test", nil, [span]}]} = OtlpTranslator.translate(body)
+      assert {:ok, [{"nested-test", nil, nil, [span]}]} = OtlpTranslator.translate(body)
       assert is_binary(span["attributes"]["nested"])
       assert {:ok, decoded} = Jason.decode(span["attributes"]["nested"])
       assert is_list(decoded) or is_map(decoded)

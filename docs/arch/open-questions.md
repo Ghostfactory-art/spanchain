@@ -100,7 +100,7 @@ auto-compare scheduler (L3) a materialized diff cache will be needed.
 - ~~**`pipeline_supervisor.ex` doesn't exist as a separate file**~~ — resolved
   in **GF-739**: a standalone module `lib/span_chain/ingestion/pipeline_supervisor.ex`
   (`use Supervisor`); `application.ex` just references it in `broadway_children/0`.
-- **`/health` endpoint** — implemented in `router.ex:38-40`, not mentioned in the prompt task
+- **`/health` endpoint** — implemented in `router.ex:55-57`, not mentioned in the prompt task
   or in `docs/development.md` top-level.
 - **`/v1/traces` endpoint and OTLP/HTTP** — GF-649 added in Sprint 4, fully
   described in `development.md:637-674`. Not in the `## Architecture` snapshot

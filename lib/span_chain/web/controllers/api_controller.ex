@@ -153,6 +153,40 @@ defmodule SpanChain.Web.ApiController do
     end
   end
 
+  @doc """
+  GF-972: artifact chain proof. Given an artifact's SHA-256, finds the ledger entry
+  whose payload carries that hash and proves the chain from genesis to it is unbroken.
+  `{"sha256": "..."}` required in the body; missing → 400.
+  """
+  def verify_artifact(conn, %{"sha256" => sha256}) do
+    case Ledger.find_and_verify_sha256(sha256) do
+      {:found, proof} ->
+        json(conn, %{
+          found: true,
+          span_id: proof.span_id,
+          run_id: proof.run_id,
+          trace_id: proof.trace_id,
+          timestamp: DateTime.to_iso8601(proof.timestamp),
+          chain_position: proof.chain_position,
+          verified: proof.verified,
+          proof: %{
+            guarantees:
+              "SHA-256 hash existed at timestamp T in an unbroken chain from genesis to this span.",
+            does_not_guarantee: "Semantic correctness of the artifact content."
+          }
+        })
+
+      :not_found ->
+        json(conn, %{found: false})
+    end
+  end
+
+  def verify_artifact(conn, _params) do
+    conn
+    |> put_status(400)
+    |> json(%{error: "missing_required_params", hint: "body must contain {\"sha256\": \"...\"}"})
+  end
+
   # --------------------------------------------------------------------------
   # Evals (metadata only — Comparator.compare/2 is NOT called, it is O(n) memory)
   # --------------------------------------------------------------------------
