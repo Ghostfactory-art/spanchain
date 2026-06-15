@@ -97,7 +97,7 @@ seams `broadway_processor_concurrency` / `broadway_batcher_concurrency`.
 
 ### Retry semantics
 
-`pipeline.ex:197-224` — 3 attempts, exp backoff `500 → 1000 → 2000 ms` in prod
+`pipeline.ex:461-487` — 3 attempts, exp backoff `500 → 1000 → 2000 ms` in prod
 (test override 1ms, keeps the negative tests under 50ms). After exhaustion:
 `Message.failed/2` → `handle_failed/2` → `DeadLetter.store/3`. The hash chain
 in the Ledger continues without the missing rows (the SGS `prev_hash` stays advanced) →

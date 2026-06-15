@@ -4,7 +4,7 @@ defmodule SpanChain.MixProject do
   def project do
     [
       app: :span_chain,
-      version: "0.1.0",
+      version: "0.61.0",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -32,7 +32,12 @@ defmodule SpanChain.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  # GF-957: `bench/` (StressTest load generator) compiles in :dev + :test only — NOT prod
+  # (kept out of the OTP release + the public repo). :test needs it because
+  # `test/span_chain/stress_bench_test.exs` (@moduletag :stress, excluded at runtime) still
+  # references SpanChain.StressTest at compile time.
+  defp elixirc_paths(:test), do: ["lib", "test/support", "bench"]
+  defp elixirc_paths(:dev), do: ["lib", "bench"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp aliases do

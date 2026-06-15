@@ -321,6 +321,31 @@ describe("gf SDK", () => {
   it("17. (GF-733) setEvalId removed from public API (regression)", () => {
     expect((gf as Record<string, unknown>)["setEvalId"]).toBeUndefined();
   });
+
+  it("18. (GF-892) root span mints a valid W3C 128-bit traceId (32 lowercase hex)", async () => {
+    gf.init({ endpoint: ENDPOINT, apiKey: "k", runId: "run-18" });
+    await gf.span("root", {}, async () => null);
+    await gf.flush();
+
+    expect(firstSpan(captured[0] as OtlpExportRequest).traceId).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it("19. (GF-892) child span inherits the root traceId; both are valid W3C format", async () => {
+    gf.init({ endpoint: ENDPOINT, apiKey: "k", runId: "run-19" });
+    await gf.span("outer", {}, async () => {
+      await gf.span("inner", {}, async () => null);
+    });
+    await gf.flush();
+
+    const allSpans = captured.flatMap((r) =>
+      r.resourceSpans.flatMap((rs) => rs.scopeSpans.flatMap((ss) => ss.spans)),
+    );
+    const outer = allSpans.find((s) => s.name === "outer");
+    const inner = allSpans.find((s) => s.name === "inner");
+    expect(outer?.traceId).toMatch(/^[0-9a-f]{32}$/);
+    expect(inner?.traceId).toMatch(/^[0-9a-f]{32}$/);
+    expect(inner?.traceId).toBe(outer?.traceId);
+  });
 });
 
 describe("toOtlpKeyValue type dispatch (GF-742)", () => {

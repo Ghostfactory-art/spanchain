@@ -54,7 +54,7 @@ build the JSON string by hand.
 
 ### `verify_ledger/1` — what it does
 
-From `ledger.ex:181-205`:
+From `ledger.ex:207-213`:
 
 ```elixir
 entries = (from l in Ledger, where l.run_id == ^run_id, order_by [asc: :epoch_id, asc: :seq])
@@ -78,7 +78,7 @@ The function recomputes the hash of each row and compares:
 |---|---|
 | **Dead-letter** | A batch failed after 3 retries → `DeadLetter.store/3` → the row doesn't exist in the Ledger. The hash chain continues (the SGS incremented `seq`/`prev_hash` anyway), but the gap is detected. A deliberate audit signal "data exists, but not in authoritative source." (`dead_letter.ex:1-15` › "not part of the hash-chain... `verify_ledger` fails — that is intentional") |
 | **Tamper** | A manual `Repo.update_all` on the payload/parent_span_id column. Smoke test shown in development.md:81-91. |
-| **Race in Pipeline retry** | If a retry succeeds but the insert is duplicate → the unique index `(run_id, epoch_id, seq)` → idempotent skip. NOT chain_broken — `on_conflict: :nothing` in `ledger.ex:148-150`. |
+| **Race in Pipeline retry** | If a retry succeeds but the insert is duplicate → the unique index `(run_id, epoch_id, seq)` → idempotent skip. NOT chain_broken — `on_conflict: :nothing` in `ledger.ex:174-177`. |
 | **Epoch Island Attack** | Someone deletes a whole epoch (e.g. all rows for `epoch_id = 5`). The first row of epoch 6 has `prev_hash = hash(last_row_of_epoch_5)`, but `last_hash` in the reduce is `hash(last_row_of_epoch_4)`. → `chain_broken`. **THIS IS EXACTLY WHAT GF-666 ADDED.** |
 
 ### Epoch boundary — why it exists and what the "Epoch Island Attack" is
@@ -92,7 +92,7 @@ defp maybe_epoch_boundary(%{seq: seq} = state) when seq > 0 and rem(seq, @epoch_
 end
 ```
 
-Every `@epoch_size = 1_000` spans (`session_gen_server.ex:41`) the epoch
+Every `@epoch_size = 1_000` spans (`session_gen_server.ex:53`) the epoch
 rolls over: `epoch_id++`, `seq=0`. Reason: the index on `(run_id, epoch_id, seq)` has
 a bounded space — without epochs `seq` would grow without bound and operations over the chain
 (verify, range queries) would slow down linearly with the length of the run.

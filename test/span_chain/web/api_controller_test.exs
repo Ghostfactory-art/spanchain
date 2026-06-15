@@ -11,6 +11,8 @@ defmodule SpanChain.Web.ApiControllerTest do
 
   @endpoint SpanChain.Web.Endpoint
   @token "test-secret"
+  # GF-972: a known artifact SHA-256 to embed in a span payload + look up via /api/verify.
+  @artifact_sha256 :crypto.hash(:sha256, "manifest-v1") |> Base.encode16(case: :lower)
 
   defp authed(conn), do: put_req_header(conn, "authorization", "Bearer #{@token}")
 
@@ -38,6 +40,42 @@ defmodule SpanChain.Web.ApiControllerTest do
         "started_at" => "2026-05-15T10:00:01Z",
         "ended_at" => "2026-05-15T10:00:02Z",
         "status" => "error"
+      }
+    ]
+
+    {entries, _} =
+      specs
+      |> Enum.with_index()
+      |> Enum.reduce({[], nil}, fn {spec, i}, {acc, prev} ->
+        entry = Ledger.build_entry(run_id, 0, i, prev, "span", spec, nil)
+        {acc ++ [entry], entry.hash}
+      end)
+
+    {2, _} = Ledger.insert_batch(entries)
+    :ok
+  end
+
+  # GF-972: seed a valid 2-span chain where the seq-1 span's payload carries `sha256`
+  # (under an arbitrary artifact key) — so the value-scan finds it and the prefix
+  # (genesis → seq 1) includes the tamper target.
+  defp seed_artifact_run(run_id, sha256) do
+    Repo.insert!(%Run{run_id: run_id, status: "running", started_at: ~U[2026-05-15 10:00:00Z]})
+
+    specs = [
+      %{
+        "span_id" => "a0",
+        "name" => "root",
+        "started_at" => "2026-05-15T10:00:00Z",
+        "ended_at" => "2026-05-15T10:00:02Z",
+        "status" => "ok"
+      },
+      %{
+        "span_id" => "a1",
+        "name" => "emit-artifact",
+        "gf.manifest.sha256" => sha256,
+        "started_at" => "2026-05-15T10:00:01Z",
+        "ended_at" => "2026-05-15T10:00:02Z",
+        "status" => "ok"
       }
     ]
 
@@ -503,6 +541,59 @@ defmodule SpanChain.Web.ApiControllerTest do
     test "record_cassette: no Bearer token → 401" do
       conn = post(build_conn(), "/api/cassettes", %{run_id: "any", cassette_id: "any"})
       assert conn.status == 401
+    end
+  end
+
+  describe "POST /api/verify (GF-972 artifact chain proof)" do
+    test "happy path: real sha256 → found true, verified true, chain_position" do
+      seed_artifact_run("verify-ok", @artifact_sha256)
+
+      body =
+        build_conn()
+        |> authed()
+        |> post("/api/verify", %{sha256: @artifact_sha256})
+        |> json_response(200)
+
+      assert body["found"] == true
+      assert body["verified"] == true
+      assert body["run_id"] == "verify-ok"
+      assert body["span_id"] == "a1"
+      assert body["chain_position"] == 1
+      assert body["proof"]["guarantees"] =~ "unbroken chain"
+      assert Map.has_key?(body["proof"], "does_not_guarantee")
+    end
+
+    test "unknown sha256 → found false" do
+      body =
+        build_conn()
+        |> authed()
+        |> post("/api/verify", %{sha256: String.duplicate("0", 64)})
+        |> json_response(200)
+
+      assert body == %{"found" => false}
+    end
+
+    test "missing sha256 param → 400 missing_required_params" do
+      conn = build_conn() |> authed() |> post("/api/verify", %{})
+      assert json_response(conn, 400)["error"] == "missing_required_params"
+    end
+
+    test "tamper: prev_hash mutated before verify → verified false (found true)" do
+      seed_artifact_run("verify-tamper", @artifact_sha256)
+
+      Repo.update_all(
+        from(l in Ledger, where: l.run_id == "verify-tamper" and l.seq == 1),
+        set: [prev_hash: "tampered000000000000000000000000"]
+      )
+
+      body =
+        build_conn()
+        |> authed()
+        |> post("/api/verify", %{sha256: @artifact_sha256})
+        |> json_response(200)
+
+      assert body["found"] == true
+      assert body["verified"] == false
     end
   end
 end

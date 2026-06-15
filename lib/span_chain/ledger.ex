@@ -205,13 +205,83 @@ defmodule SpanChain.Ledger do
   """
   @spec verify_ledger(String.t()) :: {:ok, non_neg_integer()} | {:error, :chain_broken}
   def verify_ledger(run_id) when is_binary(run_id) do
-    entries =
-      from(l in __MODULE__,
-        where: l.run_id == ^run_id,
-        order_by: [asc: l.epoch_id, asc: l.seq]
-      )
-      |> Repo.all()
+    from(l in __MODULE__,
+      where: l.run_id == ^run_id,
+      order_by: [asc: l.epoch_id, asc: l.seq]
+    )
+    |> Repo.all()
+    |> walk_chain()
+  end
 
+  @doc """
+  GF-972: artifact chain proof. Finds the ledger entry whose `payload` contains
+  `sha256` as a value (under ANY key — the artifact attribute key is not fixed)
+  and proves the hash chain from genesis up to that entry is unbroken.
+
+  Returns `{:found, proof}` where `proof.verified` is `true` iff every entry from
+  genesis to the matched entry re-hashes correctly with an unbroken `prev_hash`
+  sequence (`walk_chain/1`, the same core as `verify_ledger/1`). `chain_position`
+  is the matched entry's 0-based index from genesis. `:not_found` if no entry's
+  payload carries the hash.
+  """
+  @spec find_and_verify_sha256(String.t()) ::
+          {:found,
+           %{
+             span_id: String.t() | nil,
+             run_id: String.t(),
+             trace_id: String.t() | nil,
+             timestamp: DateTime.t(),
+             chain_position: non_neg_integer(),
+             verified: boolean()
+           }}
+          | :not_found
+  def find_and_verify_sha256(sha256) when is_binary(sha256) do
+    entry =
+      from(l in __MODULE__,
+        where:
+          fragment(
+            "EXISTS (SELECT 1 FROM jsonb_each_text(?) AS kv(k, v) WHERE kv.v = ?)",
+            l.payload,
+            ^sha256
+          ),
+        order_by: [asc: l.epoch_id, asc: l.seq],
+        limit: 1
+      )
+      |> Repo.one()
+
+    case entry do
+      nil ->
+        :not_found
+
+      e ->
+        # Chain from genesis up to and including the matched entry's (epoch_id, seq).
+        prefix =
+          from(l in __MODULE__,
+            where:
+              l.run_id == ^e.run_id and
+                (l.epoch_id < ^e.epoch_id or
+                   (l.epoch_id == ^e.epoch_id and l.seq <= ^e.seq)),
+            order_by: [asc: l.epoch_id, asc: l.seq]
+          )
+          |> Repo.all()
+
+        {:found,
+         %{
+           span_id: e.span_id,
+           run_id: e.run_id,
+           trace_id: e.trace_id,
+           timestamp: e.inserted_at,
+           chain_position: length(prefix) - 1,
+           verified: match?({:ok, _}, walk_chain(prefix))
+         }}
+    end
+  end
+
+  # Shared chain-walk core (GF-972 extraction): re-hashes an ordered list of entries
+  # and checks the unbroken `prev_hash` sequence (cross-epoch, GF-666). Used by both
+  # verify_ledger/1 (whole run) and find_and_verify_sha256/1 (genesis→entry prefix).
+  @spec walk_chain([t()]) :: {:ok, non_neg_integer()} | {:error, :chain_broken}
+  defp walk_chain(entries) do
     result =
       Enum.reduce_while(entries, {:ok, 0, nil}, fn e, {:ok, count, last_hash} ->
         expected_hash =

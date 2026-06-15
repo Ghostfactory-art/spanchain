@@ -80,6 +80,9 @@ defmodule SpanChain.Web.Router do
     get("/cassettes/replay_jobs/:id", ApiController, :get_replay_job)
     # GF-823: cancel an async replay job (same resource as the polling GET).
     delete("/cassettes/replay_jobs/:id", ApiController, :cancel_replay_job)
+
+    # GF-972: artifact SHA-256 chain proof (lookup by content hash, not run_id).
+    post("/verify", ApiController, :verify_artifact)
   end
 
   defp check_trail_auth(conn, _opts) do

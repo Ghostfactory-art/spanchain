@@ -11,6 +11,9 @@ defmodule SpanChain.Ingestion.OtlpTranslator do
 
   - `resource.attributes["service.instance.id"]` → internal `run_id`
     (missing → `{:error, :missing_run_id}`)
+  - `resource.attributes["gf.eval_id"]` → optional `eval_id` (nil if missing)
+  - `resource.attributes["gf.eval.name"]` → optional human-readable `eval_name`
+    (nil if missing, GF-868)
   - `traceId` / `spanId` / `parentSpanId` — hex string passthrough
   - `startTimeUnixNano` / `endTimeUnixNano` (string ns) → ISO 8601
     (microsecond precision; `DateTime` cannot handle nanoseconds)
@@ -38,7 +41,8 @@ defmodule SpanChain.Ingestion.OtlpTranslator do
   @type span_map :: %{required(String.t()) => term()}
 
   @spec translate(map()) ::
-          {:ok, [{String.t(), String.t() | nil, [span_map()]}]} | {:error, atom()}
+          {:ok, [{String.t(), String.t() | nil, String.t() | nil, [span_map()]}]}
+          | {:error, atom()}
   def translate(%{"resourceSpans" => resource_spans}) when is_list(resource_spans) do
     reduce_resources(resource_spans, [])
   end
@@ -54,8 +58,9 @@ defmodule SpanChain.Ingestion.OtlpTranslator do
   defp reduce_resources([resource | rest], acc) do
     with {:ok, run_id} <- extract_run_id(resource["resource"]) do
       eval_id = extract_eval_id(resource["resource"])
+      eval_name = extract_eval_name(resource["resource"])
       spans = extract_spans(resource["scopeSpans"])
-      reduce_resources(rest, [{run_id, eval_id, spans} | acc])
+      reduce_resources(rest, [{run_id, eval_id, eval_name, spans} | acc])
     end
   end
 
@@ -78,6 +83,17 @@ defmodule SpanChain.Ingestion.OtlpTranslator do
   end
 
   defp extract_eval_id(_), do: nil
+
+  # GF-868: optional human-readable eval name — `nil` if missing (backward-compatible;
+  # the eval_id fallback for the display name is applied downstream in Evals.ensure_eval_name/2).
+  defp extract_eval_name(%{"attributes" => attrs}) when is_list(attrs) do
+    case find_string_attr(attrs, "gf.eval.name") do
+      v when is_binary(v) and v != "" -> v
+      _ -> nil
+    end
+  end
+
+  defp extract_eval_name(_), do: nil
 
   defp find_string_attr(attrs, key) do
     case Enum.find(attrs, fn a -> a["key"] == key end) do

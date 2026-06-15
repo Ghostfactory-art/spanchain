@@ -28,7 +28,9 @@ Silent failures — HTTP 200, wrong answer — become inspectable instead of irr
 
 Every agent action produces a **cryptographic receipt** — a tamper-evident record
 SHA-256 chained to the previous action. Append-only. Offline verification via
-`verify_ledger` — no LLM calls or external services required.
+`verify_ledger` — no LLM calls or external services required. Prove a specific
+artifact existed unchanged at a point in time by its SHA-256 hash via
+`POST /api/verify` (returns `{found, verified, chain_position, proof}`).
 
 ---
 

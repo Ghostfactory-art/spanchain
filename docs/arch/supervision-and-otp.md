@@ -38,14 +38,14 @@ SpanChain.Supervisor                                   strategy: :one_for_one
     └── SpanChain.Web.Endpoint                         port 4001 (LiveView /trail, /eval + JSON /api GF-789)
 ```
 
-Source: `lib/span_chain/application.ex:10-23` + `broadway_children/0:41-61`.
+Source: `lib/span_chain/application.ex:11-50` + `broadway_children/0:60-66`.
 
 ### Per-node rationale
 
 **`SpanChain.Repo`** — Ecto.Repo over Postgres (GF-704; formerly SQLite). The first child deliberately: everything
 else persists through it. Crash → the root `one_for_one` restarts it independently;
 SessionSupervisor and Pipeline crash on the first DB call and recover on their own.
-WAL mode (`config.exs:15`) allows multi-reader (LiveView) without
+Postgres MVCC allows multi-reader (LiveView) without
 blocking the Pipeline writer.
 
 **Agent stack (Registry + DynamicSupervisor + Orchestrator)** — the L0 reference
