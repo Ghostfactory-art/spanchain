@@ -1,14 +1,16 @@
-Span Chain is an open-source cryptographic audit trail for AI agents.
+Span Chain is a self-hosted trace recorder and structural regression-diff layer for AI agents.
 
-Produces cryptographic receipts for every agent action — tamper-evident,
-SHA-256 hash-chained, append-only. Offline verification via verify_ledger —
-no LLM calls or external services required.
+Find where two recorded traces diverge.
 
-Compatible with LangChain, CrewAI, LlamaIndex, AutoGen, and Pydantic AI
-via standard OpenTelemetry (OTLP).
+Span Chain supports an OTLP/HTTP JSON subset.
 
-Designed to support EU AI Act Article 12 traceability, SOC 2 audit-trail
-controls, and HIPAA audit-logging requirements.
+Compare agent configuration — structure and config.
 
-Self-hosted via Docker. MIT license. Python + TypeScript SDKs.
+Trace playback / cassette re-ingest. Not agent replay.
+
+Tamper-evident after ingest.
+
+Span Chain stores received spans in a SHA-256 hash chain. Re-verification can detect edits, reordering, and gaps in the middle of that stored history. It cannot detect spans that were never received, spans removed from the end, or a chain rebuilt by the server operator.
+
+Self-hosted via Docker. MIT license. Python + TypeScript SDKs. v0.61.0.
 https://www.spanchain.dev/

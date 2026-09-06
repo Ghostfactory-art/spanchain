@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="500" viewBox="0 0 760 500" role="img" aria-label="Hash-chain ledger: each span entry is cryptographically linked to the previous; tampering is detectable">
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="500" viewBox="0 0 760 500" role="img" aria-label="Hash-chain ledger: each received span is SHA-256 linked to the previous; re-verification can detect mid-history edits">
   <rect width="760" height="500" fill="#f6f1e3"/>
 
   <!-- header -->

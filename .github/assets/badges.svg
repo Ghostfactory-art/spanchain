@@ -12,16 +12,16 @@
     <text x="216" y="17" text-anchor="middle" fill="#f6f1e3">license</text>
     <text x="266" y="17" text-anchor="middle" fill="#f6f1e3">MIT</text>
 
-    <!-- ingest: OTel-native -->
+    <!-- ingest: OTLP JSON -->
     <rect x="296" y="1" width="60" height="24" rx="4" fill="#3a342e"/>
     <rect x="352" y="1" width="94" height="24" rx="4" fill="#26516b"/>
     <text x="326" y="17" text-anchor="middle" fill="#f6f1e3">ingest</text>
-    <text x="399" y="17" text-anchor="middle" fill="#f6f1e3">OTel-native</text>
+    <text x="399" y="17" text-anchor="middle" fill="#f6f1e3">OTLP JSON</text>
 
-    <!-- replay: deterministic -->
+    <!-- playback: cassette -->
     <rect x="456" y="1" width="60" height="24" rx="4" fill="#3a342e"/>
     <rect x="512" y="1" width="108" height="24" rx="4" fill="#4a7a3a"/>
-    <text x="486" y="17" text-anchor="middle" fill="#f6f1e3">replay</text>
-    <text x="566" y="17" text-anchor="middle" fill="#f6f1e3">deterministic</text>
+    <text x="486" y="17" text-anchor="middle" fill="#f6f1e3">playback</text>
+    <text x="566" y="17" text-anchor="middle" fill="#f6f1e3">cassette</text>
   </g>
 </svg>
