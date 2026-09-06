@@ -32,7 +32,7 @@
   <g>
     <rect x="484" y="126" width="184" height="134" rx="10" fill="#0a2638" stroke="#7ec8ff" stroke-width="2.4"/>
     <rect x="484" y="126" width="184" height="30" rx="10" fill="#7ec8ff" opacity="0.12"/>
-    <text x="576" y="158" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" letter-spacing="2" fill="#7ec8ff">SOURCE OF TRUTH</text>
+    <text x="576" y="158" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" letter-spacing="2" fill="#7ec8ff">RECEIVED SPANS</text>
     <text x="576" y="192" text-anchor="middle" font-family="Inter Tight, system-ui, sans-serif" font-size="21" font-weight="700" fill="#cfe3f0">Hash-Chain</text>
     <text x="576" y="216" text-anchor="middle" font-family="Inter Tight, system-ui, sans-serif" font-size="21" font-weight="700" fill="#cfe3f0">Ledger</text>
     <text x="576" y="242" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#7ea5b8">tamper-evident after ingest</text>

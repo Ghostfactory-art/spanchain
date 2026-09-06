@@ -16,7 +16,7 @@
     <rect x="296" y="1" width="60" height="24" rx="4" fill="#3a342e"/>
     <rect x="352" y="1" width="94" height="24" rx="4" fill="#26516b"/>
     <text x="326" y="17" text-anchor="middle" fill="#f6f1e3">ingest</text>
-    <text x="399" y="17" text-anchor="middle" fill="#f6f1e3">OTLP JSON</text>
+    <text x="399" y="17" text-anchor="middle" fill="#f6f1e3">OTLP subset</text>
 
     <!-- playback: cassette -->
     <rect x="456" y="1" width="60" height="24" rx="4" fill="#3a342e"/>

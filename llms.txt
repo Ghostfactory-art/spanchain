@@ -12,5 +12,7 @@ Tamper-evident after ingest.
 
 Span Chain stores received spans in a SHA-256 hash chain. Re-verification can detect edits, reordering, and gaps in the middle of that stored history. It cannot detect spans that were never received, spans removed from the end, or a chain rebuilt by the server operator.
 
-Self-hosted via Docker. MIT license. Python + TypeScript SDKs. v0.61.0.
+MIT. Self-hosted. A GhostFactory product.
+
+Python + TypeScript SDKs. Docker. v0.61.0.
 https://www.spanchain.dev/
