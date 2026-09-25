@@ -4,7 +4,7 @@
     <rect x="0" y="1" width="62" height="24" rx="4" fill="#3a342e"/>
     <rect x="58" y="1" width="114" height="24" rx="4" fill="#c98a2b"/>
     <text x="31" y="17" text-anchor="middle" fill="#f6f1e3">status</text>
-    <text x="117" y="17" text-anchor="middle" fill="#1d1a17">launching soon</text>
+    <text x="117" y="17" text-anchor="middle" fill="#1d1a17">released</text>
 
     <!-- license: MIT -->
     <rect x="182" y="1" width="68" height="24" rx="4" fill="#3a342e"/>
