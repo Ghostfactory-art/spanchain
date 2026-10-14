@@ -3,23 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Span Chain by GhostFactory — Tamper-evident audit trail for AI agents</title>
-<meta name="description" content="Open-source cryptographic audit trail for AI agents. Tamper-evident receipts, offline verification, and deterministic replay. Compatible with LangChain, CrewAI, LlamaIndex via OTLP.">
+<title>Span Chain — Find where two recorded traces diverge.</title>
+<meta name="description" content="Span Chain is a self-hosted trace recorder and structural regression-diff layer for AI agents.">
 <link rel="canonical" href="https://www.spanchain.dev/">
 <!-- Open Graph / social preview (LinkedIn, Slack, Facebook) -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Span Chain">
 <meta property="og:url" content="https://www.spanchain.dev/">
-<meta property="og:title" content="Span Chain by GhostFactory — Tamper-evident audit trail for AI agents">
-<meta property="og:description" content="Every agent leaves a record. We keep it. Span Chain creates a cryptographically verifiable audit trail for every step your AI agent takes. Self-host for free.">
+<meta property="og:title" content="Span Chain — Find where two recorded traces diverge.">
+<meta property="og:description" content="Span Chain is a self-hosted trace recorder and structural regression-diff layer for AI agents.">
 <meta property="og:image" content="https://www.spanchain.dev/Ghostfactory_brand/spanchain-assets-pro_GH/assets/og-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Span Chain by GhostFactory — tamper-evident audit trail for AI agents">
+<meta property="og:image:alt" content="Span Chain — Find where two recorded traces diverge.">
 <!-- Twitter / X Card -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Span Chain by GhostFactory — Tamper-evident audit trail for AI agents">
-<meta name="twitter:description" content="Every agent leaves a record. We keep it. Span Chain creates a cryptographically verifiable audit trail for every step your AI agent takes.">
+<meta name="twitter:title" content="Span Chain — Find where two recorded traces diverge.">
+<meta name="twitter:description" content="Span Chain is a self-hosted trace recorder and structural regression-diff layer for AI agents.">
 <meta name="twitter:image" content="https://www.spanchain.dev/Ghostfactory_brand/spanchain-assets-pro_GH/assets/og-card.png">
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' fill='%23f6f1e3'/><mask id='e'><rect width='80' height='80' fill='white'/><rect x='27.5' y='30' width='5' height='12' rx='2.5' fill='black'/><rect x='47.5' y='30' width='5' height='12' rx='2.5' fill='black'/></mask><path d='M 12 70 L 12 37 A 28 28 0 0 1 68 37 L 68 70 L 61 64 L 54 70 L 47 64 L 40 70 L 33 64 L 26 70 L 19 64 L 12 70 Z' fill='%231d1a17' mask='url(%23e)'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -259,7 +259,7 @@ h2 em{font-style:italic;color:var(--mute);font-weight:500}
 .compare-closing{font-family:'Newsreader',serif;font-size:15.5px;line-height:1.6;color:var(--mute);max-width:680px;margin:28px auto 0;text-align:center;font-style:italic}
 
 /* -- OPEN CORE TIERS -- */
-.pricing-grid{margin-top:60px;display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.pricing-grid{margin-top:60px;display:grid;grid-template-columns:repeat(2,1fr);gap:24px;max-width:840px;margin-left:auto;margin-right:auto}
 .tier{background:linear-gradient(180deg,#fbf6e6 0%,var(--paper) 100%);border:1px solid var(--rule);padding:32px 28px 28px;position:relative;border-radius:2px;box-shadow:0 8px 16px -12px rgba(60,40,20,.4);display:flex;flex-direction:column}
 .tier::before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:repeating-linear-gradient(90deg,var(--ink) 0 12px,transparent 12px 24px);opacity:.7}
 .tier.popular{border:2px solid var(--ink);box-shadow:0 18px 32px -16px rgba(60,40,20,.55);transform:translateY(-6px)}
@@ -283,7 +283,7 @@ h2 em{font-style:italic;color:var(--mute);font-weight:500}
 .pricing-cta a:hover{color:var(--stamp-red-2)}
 @media (max-width:980px){.pricing-grid{grid-template-columns:1fr}.tier.popular{transform:none}}
 
-/* -- EU AI ACT NOTE -- */
+/* -- INTEGRITY LIMITATION NOTE -- */
 .eu-note{max-width:760px;margin:0 auto;padding:24px 32px;border-left:3px solid var(--stamp-red);background:rgba(155,42,31,.04);font-family:'Newsreader',serif;font-size:16px;line-height:1.6;color:var(--ink-2);font-style:italic;text-align:left}
 .eu-note strong{color:var(--stamp-red);font-style:normal;font-weight:600;text-transform:uppercase;letter-spacing:.08em;font-size:13px;display:block;margin-bottom:8px;font-family:'Inter Tight',sans-serif}
 
@@ -346,12 +346,12 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
       "alternateName": "Span Chain by GhostFactory",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Any",
-      "description": "Tamper-evident audit trail for production AI agents. SHA-256 hash-chain observability, deterministic VCR replay without LLM calls, and structural run comparison. Built on Elixir/OTP. Self-hosted, MIT license.",
+      "description": "Span Chain is a self-hosted trace recorder and structural regression-diff layer for AI agents.",
       "url": "https://www.spanchain.dev",
       "sameAs": "https://spanchain.art",
       "downloadUrl": "https://github.com/ghostfactory-art/spanchain",
       "installUrl": "https://github.com/ghostfactory-art/spanchain",
-      "softwareVersion": "0.54.1",
+      "softwareVersion": "0.61.0",
       "license": "https://opensource.org/licenses/MIT",
       "isAccessibleForFree": true,
       "author": {
@@ -363,19 +363,20 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
         "@type": "Offer",
         "price": "0",
         "priceCurrency": "USD",
-        "description": "Open-core. Self-hosted, MIT license."
+        "description": "MIT. Self-hosted. A GhostFactory product."
       },
       "featureList": [
-        "SHA-256 hash-chain tamper-evident audit trail",
-        "Deterministic VCR replay without LLM calls",
-        "Structural run comparison with deviation point detection",
-        "OpenTelemetry OTLP/HTTP ingest",
+        "Tamper-evident after ingest",
+        "SHA-256 hash chain of received spans",
+        "Compare agent configuration — structure and config",
+        "Trace playback / cassette re-ingest. Not agent replay.",
+        "OTLP/HTTP JSON subset ingest",
         "Python SDK",
         "TypeScript SDK",
         "Real-time LiveView trail",
         "Per-run Elixir/OTP process isolation"
       ],
-      "keywords": "AI agent observability, tamper-evident audit trail, LLM observability, OpenTelemetry, OTLP, Elixir, hash-chain, EU AI Act, AI agent debugging, VCR replay"
+      "keywords": "AI agent traces, structural regression-diff, OpenTelemetry, OTLP/HTTP JSON subset, Elixir, SHA-256 hash chain, self-hosted, cassette re-ingest"
     },
     {
       "@type": "FAQPage",
@@ -386,7 +387,7 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
           "name": "What is Span Chain?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Span Chain is an auditable harness for production AI agents. Every LLM call, tool use, and decision is captured in a tamper-evident, append-only hash chain — SHA-256 verified, and deterministically replayable without LLM API calls."
+            "text": "Span Chain is a self-hosted trace recorder and structural regression-diff layer for AI agents."
           }
         },
         {
@@ -394,23 +395,23 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
           "name": "How is Span Chain different from LangSmith or Langfuse?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Standard observability tools like LangSmith or Langfuse show you what your agent did via mutable traces. Span Chain proves it cryptographically. Traces in Span Chain are append-only, hash-chained, and self-hosted, ensuring the audit trail cannot be silently altered."
+            "text": "Find where two recorded traces diverge. Compare agent configuration — structure and config. Span Chain is a self-hosted trace recorder and structural regression-diff layer for AI agents."
           }
         },
         {
           "@type": "Question",
-          "name": "What does tamper-evident mean for AI agents?",
+          "name": "What does tamper-evident after ingest mean?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Every Span Chain event is SHA-256 hashed and mathematically linked to the previous span. A single changed byte anywhere in the historical ledger breaks the hash chain. Span Chain does not prevent tampering; instead, the verify_ledger function makes any tampering instantly detectable."
+            "text": "Tamper-evident after ingest. Span Chain stores received spans in a SHA-256 hash chain. Re-verification can detect edits, reordering, and gaps in the middle of that stored history. It cannot detect spans that were never received, spans removed from the end, or a chain rebuilt by the server operator."
           }
         },
         {
           "@type": "Question",
-          "name": "Can I replay an AI agent run without LLM calls?",
+          "name": "What is trace playback?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. Span Chain records a VCR-style cassette of every agent run. Debug replay is deterministic and costs $0 — zero live LLM calls and zero API credits. Engineers can compare the replayed span tree against a baseline to identify the exact point of deviation during model upgrades."
+            "text": "Trace playback / cassette re-ingest. Not agent replay."
           }
         },
         {
@@ -418,7 +419,7 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
           "name": "Does Span Chain support OpenTelemetry?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. Span Chain accepts OpenTelemetry (OTLP/HTTP) — partial standard subset. Engineers can connect any OTel-compatible client, including the official Span Chain Python and TypeScript SDKs, without proprietary vendor lock-in."
+            "text": "Span Chain supports an OTLP/HTTP JSON subset. Python and TypeScript SDKs are included."
           }
         },
         {
@@ -426,23 +427,15 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
           "name": "How do I self-host Span Chain?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Span Chain is self-hosted with Docker Compose: clone the GitHub repository (ghostfactory-art/spanchain), copy .env.example to .env, and run docker compose up. The core is MIT licensed. There are no usage limits, no external vendor dependencies, and no trace data leaves the user's infrastructure."
+            "text": "Clone the GitHub repository (ghostfactory-art/spanchain), copy .env.example to .env, and run docker compose up. MIT. Self-hosted. A GhostFactory product."
           }
         },
         {
           "@type": "Question",
-          "name": "Is Span Chain relevant for EU AI Act compliance?",
+          "name": "What is the GF-872 field report?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. EU AI Act Article 12 requires strict audit trail documentation for high-risk AI systems (Annex III applies from 2 December 2027). Span Chain's append-only, cryptographically verifiable ledger is designed to support EU AI Act Article 12 traceability requirements."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "What is the performance baseline for Span Chain?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Span Chain is built on Elixir/OTP, isolating every agent session into its own BEAM process. The system is benchmarked at 571 spans/second with 1,000 concurrent agents, achieving 0 corrupted chains and perfect integrity during the 10,000-span stress tests."
+            "text": "A self-hosted OTP stress test recorded 10,000 spans across 1,000 concurrent agents at 571 spans/second with 0 corrupted sampled chains. It is a lab field report, not a product guarantee."
           }
         },
         {
@@ -450,7 +443,7 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
           "name": "What programming languages does the Span Chain SDK support?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Span Chain provides official SDKs for Python (3.11+) and TypeScript/Node.js (18+). Because the ingestion layer is built on the OTLP/HTTP JSON standard, any language with an OpenTelemetry exporter can write to the ledger."
+            "text": "Span Chain provides SDKs for Python (3.11+) and TypeScript/Node.js (18+). Span Chain supports an OTLP/HTTP JSON subset."
           }
         }
       ]
@@ -467,7 +460,7 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
     <div class="grp">
       <span class="seal">Span Chain by GhostFactory</span>
       <span>MIT License</span>
-      <span>OTLP/HTTP ingest</span>
+      <span>OTLP/HTTP JSON subset</span>
       <span>Elixir / OTP</span>
       <span>Python + TypeScript SDK</span>
     </div>
@@ -503,13 +496,13 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
 <header class="hero">
   <div class="wrap">
     <div class="hero-head">
-      <span class="eyebrow"><span class="dot"></span>Span Chain · auditable harness for AI agents</span>
-      <h1 class="display-h">You can't ask what your agent did.<br>You have to <em style="color:var(--stamp-red)">prove it.</em></h1>
-      <p class="lede">Every agent leaves a record. We keep it.</p>
+      <span class="eyebrow"><span class="dot"></span>Span Chain · v0.61.0</span>
+      <h1 class="display-h">Find where two recorded traces <em style="color:var(--stamp-red)">diverge.</em></h1>
+      <p class="lede">Span Chain is a self-hosted trace recorder and structural regression-diff layer for AI agents.</p>
       <p class="lede">
-        Span Chain is the <strong>auditable harness</strong> for production AI agents —
-        every LLM call, every decision, every tool call captured in a tamper-evident, append-only chain.
-        Cryptographically verifiable. Deterministically replayable without LLM calls.
+        Span Chain supports an OTLP/HTTP JSON subset.
+        Compare agent configuration — structure and config.
+        Trace playback / cassette re-ingest. Not agent replay.
       </p>
     </div>
 
@@ -558,8 +551,8 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
         </div>
 
         <div class="doss-body">
-          <p>Run observed across <b>4 spans</b> in 265ms total. <code>verify_ledger</code> PASS — chain integrity intact, 4/4 spans signed and linked.</p>
-          <p class="note">Replay this run deterministically from the cassette — no LLM calls, $0 cost. Structural diff against baseline shows the exact deviation point.</p>
+          <p>Run observed across <b>4 spans</b> in 265ms total. <code>verify_ledger</code> PASS — 4/4 received spans hash-linked.</p>
+          <p class="note">Trace playback / cassette re-ingest. Not agent replay. Compare agent configuration — structure and config.</p>
         </div>
 
         <div class="doss-foot">
@@ -645,14 +638,14 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
             <g>
               <path class="leader" d="M 20 170 L 540 170"/>
               <path class="leader" d="M 20 165 L 20 175 M 540 165 L 540 175"/>
-              <text class="dim" x="280" y="167" text-anchor="middle">SHA-256 hash-chain · append-only · 12ms verify</text>
+              <text class="dim" x="280" y="167" text-anchor="middle">SHA-256 hash chain of received spans</text>
             </g>
 
             <!-- verify summary -->
             <g>
               <text class="lbl" x="280" y="210" text-anchor="middle" style="font-size:11px;letter-spacing:.2em">verify_ledger</text>
-              <text class="summary" x="280" y="235" text-anchor="middle">Chain integrity: OK · 4/4 spans verified</text>
-              <text class="dim" x="280" y="258" text-anchor="middle">a single modified byte anywhere fails verification</text>
+              <text class="summary" x="280" y="235" text-anchor="middle">Tamper-evident after ingest · 4/4 received spans</text>
+              <text class="dim" x="280" y="258" text-anchor="middle">edits / reorder / mid-history gaps are detectable</text>
             </g>
           </svg>
         </div>
@@ -662,7 +655,7 @@ footer{border-top:1px solid var(--rule);background:var(--paper-2);padding:0 0 32
           <div class="field"><div class="lbl">Built by</div><div class="val">You</div></div>
           <div class="field"><div class="lbl">License</div><div class="val">MIT</div></div>
           <div class="field"><div class="lbl">Sheet</div><div class="val">01 / 01</div></div>
-          <div class="field"><div class="lbl">Rev</div><div class="val">v0.54.1</div></div>
+          <div class="field"><div class="lbl">Rev</div><div class="val">v0.61.0</div></div>
         </div>
       </article>
 
@@ -682,30 +675,30 @@ docker compose up</pre>
 <div class="ticker">
   <div class="ticker-row">
     <span><b>MIT License</b></span><span class="sep">·</span>
-    <span class="red">OTLP/HTTP ingest</span><span class="sep">·</span>
-    <span>SHA-256 hash-chain</span><span class="sep">·</span>
-    <span class="blue">append-only</span><span class="sep">·</span>
+    <span class="red">OTLP/HTTP JSON subset</span><span class="sep">·</span>
+    <span>SHA-256 hash chain</span><span class="sep">·</span>
+    <span class="blue">self-hosted</span><span class="sep">·</span>
     <span><b>verify_ledger</b></span><span class="sep">·</span>
     <span>Elixir / OTP</span><span class="sep">·</span>
     <span class="red">Python SDK</span><span class="sep">·</span>
     <span>TypeScript SDK</span><span class="sep">·</span>
-    <span class="blue">tamper-evident</span><span class="sep">·</span>
+    <span class="blue">tamper-evident after ingest</span><span class="sep">·</span>
     <span>per-run isolation</span><span class="sep">·</span>
-    <span><b>VCR replay</b></span><span class="sep">·</span>
-    <span class="red">$0 debug cost</span><span class="sep">·</span>
+    <span><b>cassette re-ingest</b></span><span class="sep">·</span>
+    <span class="red">Not agent replay.</span><span class="sep">·</span>
     <span>open source</span><span class="sep">·</span>
     <span><b>MIT License</b></span><span class="sep">·</span>
-    <span class="red">OTLP/HTTP ingest</span><span class="sep">·</span>
-    <span>SHA-256 hash-chain</span><span class="sep">·</span>
-    <span class="blue">append-only</span><span class="sep">·</span>
+    <span class="red">OTLP/HTTP JSON subset</span><span class="sep">·</span>
+    <span>SHA-256 hash chain</span><span class="sep">·</span>
+    <span class="blue">self-hosted</span><span class="sep">·</span>
     <span><b>verify_ledger</b></span><span class="sep">·</span>
     <span>Elixir / OTP</span><span class="sep">·</span>
     <span class="red">Python SDK</span><span class="sep">·</span>
     <span>TypeScript SDK</span><span class="sep">·</span>
-    <span class="blue">tamper-evident</span><span class="sep">·</span>
+    <span class="blue">tamper-evident after ingest</span><span class="sep">·</span>
     <span>per-run isolation</span><span class="sep">·</span>
-    <span><b>VCR replay</b></span><span class="sep">·</span>
-    <span class="red">$0 debug cost</span><span class="sep">·</span>
+    <span><b>cassette re-ingest</b></span><span class="sep">·</span>
+    <span class="red">Not agent replay.</span><span class="sep">·</span>
     <span>open source</span><span class="sep">·</span>
   </div>
 </div>
@@ -716,41 +709,41 @@ docker compose up</pre>
     <div class="section-head">
       <div>
         <div class="section-tag">01 — What's in a record</div>
-        <h2>Six entries. <em>One</em> complete record.</h2>
+        <h2>Six entries. <em>One</em> dossier.</h2>
       </div>
-      <p class="section-lede">Span Chain isn't a logging tool. It's six capabilities, signed and chained, that turn agent runs into evidence — searchable, replayable, verifiable.</p>
+      <p class="section-lede">Span Chain is a self-hosted trace recorder and structural regression-diff layer for AI agents. Six capabilities in one recorder — ingest, chain, compare, playback, trail, isolation.</p>
     </div>
 
     <div class="records-grid">
       <article class="rec">
-        <div class="topline"><span>Entry · <b>01</b></span><span class="doss-stamp-mini red">Cryptographic</span></div>
-        <h3>Tamper-evident audit trail</h3>
-        <p class="desc">Every agent span — SHA-256 hash linked to the previous. <code>verify_ledger</code> detects any manipulation. One changed byte anywhere in history = chain broken.</p>
+        <div class="topline"><span>Entry · <b>01</b></span><span class="doss-stamp-mini red">After ingest</span></div>
+        <h3>Tamper-evident after ingest</h3>
+        <p class="desc">Tamper-evident after ingest. <code>verify_ledger</code> re-walks the SHA-256 hash chain of received spans. See the limitation on this page.</p>
       </article>
       <article class="rec">
-        <div class="topline"><span>Entry · <b>02</b></span><span class="doss-stamp-mini">Analytical</span></div>
-        <h3>Structural run comparison</h3>
-        <p class="desc">Run N agents on the same prompt. Span tree diff shows the exact deviation point — not just Run B was slower.</p>
+        <div class="topline"><span>Entry · <b>02</b></span><span class="doss-stamp-mini">Diff</span></div>
+        <h3>Structural regression-diff</h3>
+        <p class="desc">Compare agent configuration — structure and config. Find where two recorded traces diverge.</p>
       </article>
       <article class="rec">
-        <div class="topline"><span>Entry · <b>03</b></span><span class="doss-stamp-mini red">$0 cost</span></div>
-        <h3>VCR deterministic replay</h3>
-        <p class="desc">Replay any run deterministically — no LLM calls. Replay from cassette = $0. Every retry during debug would otherwise cost another LLM call.</p>
+        <div class="topline"><span>Entry · <b>03</b></span><span class="doss-stamp-mini red">Cassette</span></div>
+        <h3>Trace playback</h3>
+        <p class="desc">Trace playback / cassette re-ingest. Not agent replay.</p>
       </article>
       <article class="rec">
-        <div class="topline"><span>Entry · <b>04</b></span><span class="doss-stamp-mini">Standard</span></div>
-        <h3>OTLP/HTTP ingest</h3>
-        <p class="desc">OpenTelemetry protocol. Python SDK + TypeScript SDK. Connect any OTel-compatible client — no proprietary SDK lock-in.</p>
+        <div class="topline"><span>Entry · <b>04</b></span><span class="doss-stamp-mini">Subset</span></div>
+        <h3>OTLP/HTTP JSON subset</h3>
+        <p class="desc">Span Chain supports an OTLP/HTTP JSON subset. Python SDK + TypeScript SDK included.</p>
       </article>
       <article class="rec">
         <div class="topline"><span>Entry · <b>05</b></span><span class="doss-stamp-mini">Live</span></div>
         <h3>Real-time trail</h3>
-        <p class="desc">LiveView <code>/trail</code> — spans stream in live via PubSub, broadcast right after the hash-chain commit. No polling.</p>
+        <p class="desc">LiveView <code>/trail</code> — spans stream in live via PubSub, broadcast after the hash-chain commit. No polling.</p>
       </article>
       <article class="rec">
         <div class="topline"><span>Entry · <b>06</b></span><span class="doss-stamp-mini">OTP</span></div>
         <h3>Per-run isolation</h3>
-        <p class="desc">Every run in an isolated <code>SessionGenServer</code> (~2 KB heap). OTP actor model — a million concurrent runs without interference.</p>
+        <p class="desc">Every run in an isolated <code>SessionGenServer</code> (~2 KB heap). OTP actor model — concurrent runs stay in their own processes.</p>
       </article>
     </div>
   </div>
@@ -762,9 +755,9 @@ docker compose up</pre>
     <div class="anatomy-head">
       <div>
         <div class="anatomy-tag">02 — Anatomy of a record</div>
-        <h3>Eight signed fields. <em>One</em> signed entry.</h3>
+        <h3>Eight fields. <em>One</em> hash-chain entry.</h3>
       </div>
-      <p class="anatomy-lede">Every span is a signed entry. Every entry links to the previous. One changed byte — chain broken. Below: every field that makes up one entry in the hash chain.</p>
+      <p class="anatomy-lede">Every received span is a hash-chain entry. Every entry links to the previous. Below: every field that makes up one entry in the stored history.</p>
     </div>
 
     <div class="anatomy-canvas">
@@ -833,7 +826,7 @@ docker compose up</pre>
           <circle class="tick" cx="960" cy="220" r="13"/>
           <text class="num" x="960" y="224" text-anchor="middle" fill="#0e3147">06</text>
           <text class="lbl" x="980" y="204">sha256_hash</text>
-          <text class="role" x="980" y="218">signs this entry</text>
+          <text class="role" x="980" y="218">hashes this entry</text>
           <text class="dim" x="980" y="232">32 bytes</text>
         </g>
         <!-- callout 07 — eval_id (top-right) -->
@@ -858,7 +851,7 @@ docker compose up</pre>
         <g>
           <path class="leader" d="M 200 442 L 960 442"/>
           <path class="leader" d="M 200 436 L 200 448 M 960 436 L 960 448"/>
-          <text class="dim" x="580" y="438" text-anchor="middle">verify_ledger ✓ · entries signed · scale 1:1</text>
+          <text class="dim" x="580" y="438" text-anchor="middle">verify_ledger ✓ · hash-linked · scale 1:1</text>
         </g>
       </svg>
     </div>
@@ -868,7 +861,7 @@ docker compose up</pre>
       <div class="field"><div class="lbl-t">DWG #</div><div class="val">GF-SPAN-01</div></div>
       <div class="field"><div class="lbl-t">Scale</div><div class="val">1:1</div></div>
       <div class="field"><div class="lbl-t">Sheet</div><div class="val">02 / 03</div></div>
-      <div class="field"><div class="lbl-t">Rev</div><div class="val">v0.54.1</div></div>
+      <div class="field"><div class="lbl-t">Rev</div><div class="val">v0.61.0</div></div>
       <div class="field"><div class="lbl-t">License</div><div class="val">MIT · 2026</div></div>
     </div>
   </div>
@@ -916,9 +909,9 @@ docker compose up</pre>
         <div class="legend-item">
           <div class="num">06</div>
           <h5>sha256_hash</h5>
-          <div class="role-t">Signs this entry</div>
-          <p class="body-t">Detects single-byte modification anywhere in the chain. verify_ledger re-walks instantly.</p>
-          <div class="measure"><span>algo <b>sha-256</b></span><span>ver <b>12ms</b></span></div>
+          <div class="role-t">Hashes this entry</div>
+          <p class="body-t">SHA-256 of this entry. <code>verify_ledger</code> re-walks the stored hash chain.</p>
+          <div class="measure"><span>algo <b>sha-256</b></span><span>w <b>32 B</b></span></div>
         </div>
         <div class="legend-item">
           <div class="num">07</div>
@@ -931,7 +924,7 @@ docker compose up</pre>
           <div class="num">08</div>
           <h5>trace_id</h5>
           <div class="role-t">W3C OTel compat</div>
-          <p class="body-t">128-bit identifier. Joins your existing distributed tracing. OTLP/HTTP ingest — no SDK rewrites.</p>
+          <p class="body-t">128-bit identifier. Joins existing distributed tracing. Span Chain supports an OTLP/HTTP JSON subset.</p>
           <div class="measure"><span>w <b>128 bit</b></span><span>std <b>W3C</b></span></div>
         </div>
       </div>
@@ -945,29 +938,29 @@ docker compose up</pre>
     <div class="section-head">
       <div>
         <div class="section-tag">03 — How a run enters the record</div>
-        <h2>Three steps. <em>One</em> signed chain.</h2>
+        <h2>Three steps. <em>One</em> hash chain.</h2>
       </div>
-      <p class="section-lede">Standard OpenTelemetry input. Cryptographic chain in the middle. Mathematical verification on the way out — no sampling, no best-effort.</p>
+      <p class="section-lede">Span Chain supports an OTLP/HTTP JSON subset. Received spans enter a SHA-256 hash chain. Trace playback / cassette re-ingest. Not agent replay.</p>
     </div>
 
     <div class="enter-flow">
       <div class="enter-step">
         <div class="num">Step 01 · Instrument</div>
         <h4>Add <code>@gf.trace</code>.</h4>
-        <p class="desc">Add <code>@gf.trace</code> to your agent. Every LLM call, tool use, and decision is captured automatically as a span. Python + TypeScript SDKs included.</p>
+        <p class="desc">Add <code>@gf.trace</code> to your agent. LLM calls, tool use, and decisions are captured as spans. Python + TypeScript SDKs included.</p>
         <span class="step-stamp">Python · TypeScript</span>
       </div>
       <div class="enter-step">
         <div class="num">Step 02 · Chain</div>
         <h4>SHA-256 links each span.</h4>
-        <p class="desc">The backend attaches a SHA-256 hash linked to the previous span. Append-only ledger. <code>verify_ledger</code> anytime — instant chain re-walk.</p>
+        <p class="desc">The backend attaches a SHA-256 hash linked to the previous received span. <code>verify_ledger</code> re-walks that stored history. Tamper-evident after ingest.</p>
         <span class="step-stamp">Elixir · OTP</span>
       </div>
       <div class="enter-step">
-        <div class="num">Step 03 · Replay</div>
-        <h4>Run failed? Replay from cassette.</h4>
-        <p class="desc">When an agent fails, replay that exact run from cassette. No LLM calls, $0 cost. Compare two span trees side-by-side — see where it went wrong.</p>
-        <span class="step-stamp">VCR · structural diff</span>
+        <div class="num">Step 03 · Playback</div>
+        <h4>Trace playback / cassette re-ingest.</h4>
+        <p class="desc">Trace playback / cassette re-ingest. Not agent replay. Compare agent configuration — structure and config.</p>
+        <span class="step-stamp">Not agent replay.</span>
       </div>
     </div>
   </div>
@@ -981,7 +974,7 @@ docker compose up</pre>
         <div class="section-tag">Field report · GF-872</div>
         <h2>10,000 spans.<br><em>Zero</em> corrupted.</h2>
       </div>
-      <p class="section-lede">Self-hosted OTP stress test: 1,000 concurrent agents, 17.5 seconds. Every run in its own isolated process — a crash in one doesn't touch the others. <code>verify_ledger</code>: 0 corrupted.</p>
+      <p class="section-lede">Self-hosted OTP field report (GF-872): 1,000 concurrent agents, 17.5 seconds. Every run in its own isolated process. <code>verify_ledger</code> on the sampled set: 0 corrupted. A lab report, not a product guarantee.</p>
     </div>
 
     <div class="stats-row">
@@ -1020,7 +1013,7 @@ docker compose up</pre>
         <div class="section-tag">04 — Positioning</div>
         <h2>Not another observability tool.</h2>
       </div>
-      <p class="section-lede">Span Chain is a compliance &amp; governance layer. It sits beneath your observability — not What did the agent do?, but What did the agent do — <em>proven</em>.</p>
+      <p class="section-lede">Find where two recorded traces diverge. Compare agent configuration — structure and config. Span Chain is a self-hosted trace recorder and structural regression-diff layer for AI agents.</p>
     </div>
 
     <div class="compare-wrap">
@@ -1036,32 +1029,32 @@ docker compose up</pre>
           <tr>
             <th scope="row">Question</th>
             <td>What did the agent do?</td>
-            <td class="win">What did the agent do — <em>proven</em>.</td>
+            <td class="win">Find where two recorded traces <em>diverge</em>.</td>
           </tr>
           <tr>
-            <th scope="row">Data guarantee</th>
-            <td>None</td>
-            <td class="win">SHA-256 hash-chain (tamper-evident)</td>
+            <th scope="row">Stored history</th>
+            <td>Mutable traces</td>
+            <td class="win">SHA-256 hash chain of received spans</td>
           </tr>
           <tr>
-            <th scope="row">Replay</th>
-            <td>Session replay</td>
-            <td class="win">Deterministic VCR + structural diff</td>
+            <th scope="row">Playback</th>
+            <td>Session replay / re-run</td>
+            <td class="win">Trace playback / cassette re-ingest. Not agent replay.</td>
           </tr>
           <tr class="highlight">
-            <th scope="row">Debug cost</th>
-            <td>Every retry = LLM call</td>
-            <td class="win">Replay from cassette = $0</td>
+            <th scope="row">Compare</th>
+            <td>Dashboards, scores</td>
+            <td class="win">Compare agent configuration — structure and config</td>
           </tr>
           <tr>
-            <th scope="row">Buyer</th>
-            <td>Developer</td>
-            <td class="win">Developer without own framework + compliance</td>
+            <th scope="row">Offer</th>
+            <td>Vendor SaaS</td>
+            <td class="win">MIT. Self-hosted.</td>
           </tr>
           <tr>
-            <th scope="row">Security guarantee</th>
-            <td>None — mutable traces can be rewritten</td>
-            <td class="win">Append-only, hash-chained — tamper-evident</td>
+            <th scope="row">Integrity</th>
+            <td>Mutable traces can be rewritten</td>
+            <td class="win">Tamper-evident after ingest</td>
           </tr>
           <tr>
             <th scope="row">Architecture</th>
@@ -1072,7 +1065,7 @@ docker compose up</pre>
       </table>
     </div>
     <p class="compare-closing">
-      Span Chain doesn't compete with LangSmith. It sits beneath it. Your observability shows what happened. Span Chain proves it — cryptographically.
+      Span Chain is a self-hosted trace recorder and structural regression-diff layer for AI agents. It records traces; it does not replace your observability vendor.
     </p>
   </div>
 </section>
@@ -1083,59 +1076,43 @@ docker compose up</pre>
     <div class="section-head">
       <div>
         <div class="section-tag">05 — Open core</div>
-        <h2>Open core. <em>Three</em> tiers.</h2>
+        <h2>MIT. <em>Self-hosted.</em></h2>
       </div>
-      <p class="section-lede">Core is MIT and self-host for free — Elixir backend, both SDKs, OTLP, UI, VCR replay. Cloud and Enterprise extend self-hosted ergonomics, not feature paywalls.</p>
+      <p class="section-lede">The public offer is MIT self-host: Elixir backend, both SDKs, OTLP/HTTP JSON subset, UI, comparator, cassette re-ingest. Cloud is a waitlist only.</p>
     </div>
 
     <div class="pricing-grid">
-      <article class="tier">
-        <div class="tab">Tier · Core</div>
+      <article class="tier popular">
+        <div class="tab">Offer · Core</div>
         <div class="ref">MIT · self-host</div>
         <h4>Core</h4>
-        <div class="price">Free <em>/ forever</em></div>
-        <p class="blurb">Self-host everything. Elixir backend + Python/TS SDK + OTLP + UI + Comparator + VCR replay. All of it.</p>
+        <div class="price">Free <em>/ MIT</em></div>
+        <p class="blurb">Self-host the recorder. Elixir backend + Python/TS SDK + OTLP/HTTP JSON subset + UI + comparator + cassette re-ingest.</p>
         <ol>
           <li>Elixir/OTP backend + PostgreSQL 16</li>
           <li>Python SDK + TypeScript SDK</li>
-          <li>OTLP/HTTP JSON ingest + Bearer auth</li>
+          <li>OTLP/HTTP JSON subset + Bearer auth</li>
           <li>LiveView <code>/trail</code> (real-time) + React UI</li>
-          <li>Evals comparator — structural run diff</li>
-          <li>VCR cassette replay + <code>verify_ledger</code></li>
+          <li>Compare agent configuration — structure and config</li>
+          <li>Trace playback / cassette re-ingest. Not agent replay.</li>
         </ol>
-        <a href="https://github.com/ghostfactory-art/spanchain" class="file-btn">Self-host for free →</a>
-      </article>
-      <article class="tier popular">
-        <div class="tab">Tier · Cloud</div>
-        <div class="ref">Coming soon</div>
-        <h4>Cloud</h4>
-        <div class="price">TBD <em>/ managed</em></div>
-        <p class="blurb">Managed hosting. Multi-tenant. Alerting. Advanced evals. For teams that don't want to run their own instances.</p>
-        <ol>
-          <li>Hosted Span Chain instance</li>
-          <li>Multi-tenant workspace + RBAC</li>
-          <li>Alerting (loop detection, cost spikes)</li>
-          <li>Managed eval history + dashboards</li>
-          <li>Usage-based billing (per spans)</li>
-          <li>SLA + uptime monitoring</li>
-        </ol>
-        <a href="mailto:jonesjiri@gmail.com?subject=Span%20Chain%20Cloud%20—%20waitlist" class="file-btn">Join waitlist →</a>
+        <a href="https://github.com/ghostfactory-art/spanchain" class="file-btn">Self-host on GitHub →</a>
       </article>
       <article class="tier">
-        <div class="tab">Tier · Enterprise</div>
-        <div class="ref">Contact us</div>
-        <h4>Enterprise</h4>
-        <div class="price">Talk to us <em>/ regulated</em></div>
-        <p class="blurb">For regulated work, compliance export, external timestamping. When cryptographically verifiable isn't enough and you need tamper-proof.</p>
+        <div class="tab">Waitlist · Cloud</div>
+        <div class="ref">Coming soon</div>
+        <h4>Cloud</h4>
+        <div class="price">Waitlist <em>/ hosted</em></div>
+        <p class="blurb">A hosted instance of the same MIT recorder. Waitlist only — no extra integrity pitch.</p>
         <ol>
-          <li>RBAC + SSO (SAML, OIDC)</li>
-          <li>Compliance export (PDF + JSON audit)</li>
-          <li>External TSA anchoring (RFC 3161) — planned</li>
-          <li>Tamper-proof guarantees (3rd party) — planned</li>
-          <li>In-region deploy + indefinite retention</li>
-          <li>Dedicated support + SLA</li>
+          <li>Hosted Span Chain instance</li>
+          <li>Same OTLP/HTTP JSON subset ingest</li>
+          <li>Same SHA-256 hash chain of received spans</li>
+          <li>Same structural regression-diff</li>
+          <li>Same cassette re-ingest</li>
+          <li>We operate the instance</li>
         </ol>
-        <a href="mailto:jonesjiri@gmail.com?subject=Span%20Chain%20Enterprise%20—%20briefing" class="file-btn">Request briefing →</a>
+        <a href="mailto:jonesjiri@gmail.com?subject=Span%20Chain%20Cloud%20—%20waitlist" class="file-btn">Join waitlist →</a>
       </article>
     </div>
 
@@ -1146,19 +1123,17 @@ docker compose up</pre>
   </div>
 </section>
 
-<!-- -- CLOSING + EU AI ACT -- -->
+<!-- -- CLOSING + INTEGRITY LIMITATION -- -->
 <section class="closing">
   <div class="wrap">
     <div class="eu-note" style="margin-bottom:54px">
-      <strong>EU AI Act · Article 12</strong>
-      EU AI Act Article 12 requires audit trails integrated into core system design — not added as an afterthought. Annex III applies from 2. 12. 2027. Span Chain is built for this.
+      <strong>Tamper-evident after ingest</strong>
+      Span Chain stores received spans in a SHA-256 hash chain. Re-verification can detect edits, reordering, and gaps in the middle of that stored history. It cannot detect spans that were never received, spans removed from the end, or a chain rebuilt by the server operator.
     </div>
-    <p class="compliance-heading">Built for audit &amp; compliance programs</p>
-    <p class="lede">Supports EU AI Act Article 12 traceability, SOC 2 audit-trail controls, and HIPAA audit logging.</p>
 
-    <div class="section-tag">06 — Ship your first verified run</div>
+    <div class="section-tag">06 — Self-host the recorder</div>
     <h2>The chain is <em>open.</em></h2>
-    <p class="lede">Five minutes to install. One minute to instrument your first agent. <code>verify_ledger</code> in 12ms.</p>
+    <p class="lede">Clone, copy <code>.env.example</code>, <code>docker compose up</code>. MIT. Self-hosted. A GhostFactory product.</p>
     <div class="closing-ctas">
       <a class="btn btn-stamp" href="https://github.com/ghostfactory-art/spanchain">Self-host for free <span class="arr">→</span></a>
       <a class="btn btn-ghost" href="mailto:jonesjiri@gmail.com">Request early access</a>
@@ -1189,31 +1164,28 @@ docker compose up</pre>
     <h2>Frequently Asked Questions</h2>
 
     <h3 style="margin-top:2rem;margin-bottom:.5rem">What is Span Chain?</h3>
-    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Span Chain is an auditable harness for production AI agents. Every LLM call, tool use, and decision is captured in a tamper-evident, append-only hash chain — SHA-256 verified, and deterministically replayable without LLM API calls.</p>
+    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Span Chain is a self-hosted trace recorder and structural regression-diff layer for AI agents.</p>
 
     <h3 style="margin-top:2rem;margin-bottom:.5rem">How is Span Chain different from LangSmith or Langfuse?</h3>
-    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Standard observability tools like LangSmith or Langfuse show you what your agent did via mutable traces. Span Chain proves it cryptographically. Traces in Span Chain are append-only, hash-chained, and self-hosted, ensuring the audit trail cannot be silently altered.</p>
+    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Find where two recorded traces diverge. Compare agent configuration — structure and config. Span Chain is a self-hosted trace recorder and structural regression-diff layer for AI agents.</p>
 
-    <h3 style="margin-top:2rem;margin-bottom:.5rem">What does tamper-evident mean for AI agents?</h3>
-    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Every Span Chain event is SHA-256 hashed and mathematically linked to the previous span. A single changed byte anywhere in the historical ledger breaks the hash chain. Span Chain does not prevent tampering; instead, the <code>verify_ledger</code> function makes any tampering instantly detectable.</p>
+    <h3 style="margin-top:2rem;margin-bottom:.5rem">What does tamper-evident after ingest mean?</h3>
+    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Tamper-evident after ingest. Span Chain stores received spans in a SHA-256 hash chain. Re-verification can detect edits, reordering, and gaps in the middle of that stored history. It cannot detect spans that were never received, spans removed from the end, or a chain rebuilt by the server operator.</p>
 
-    <h3 style="margin-top:2rem;margin-bottom:.5rem">Can I replay an AI agent run without LLM calls?</h3>
-    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Yes. Span Chain records a VCR-style cassette of every agent run. Debug replay is deterministic and costs $0 — zero live LLM calls and zero API credits. Engineers can compare the replayed span tree against a baseline to identify the exact point of deviation during model upgrades.</p>
+    <h3 style="margin-top:2rem;margin-bottom:.5rem">What is trace playback?</h3>
+    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Trace playback / cassette re-ingest. Not agent replay.</p>
 
     <h3 style="margin-top:2rem;margin-bottom:.5rem">Does Span Chain support OpenTelemetry?</h3>
-    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Yes. Span Chain accepts OpenTelemetry (OTLP/HTTP) — partial standard subset. Engineers can connect any OTel-compatible client, including the official Span Chain Python and TypeScript SDKs, without proprietary vendor lock-in.</p>
+    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Span Chain supports an OTLP/HTTP JSON subset. Python and TypeScript SDKs are included.</p>
 
     <h3 style="margin-top:2rem;margin-bottom:.5rem">How do I self-host Span Chain?</h3>
-    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Span Chain is self-hosted with Docker Compose: clone the GitHub repository (<code>ghostfactory-art/spanchain</code>), copy <code>.env.example</code> to <code>.env</code>, and run <code>docker compose up</code>. The core is MIT licensed. There are no usage limits, no external vendor dependencies, and no trace data leaves the user's infrastructure.</p>
+    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Clone the GitHub repository (<code>ghostfactory-art/spanchain</code>), copy <code>.env.example</code> to <code>.env</code>, and run <code>docker compose up</code>. MIT. Self-hosted. A GhostFactory product.</p>
 
-    <h3 style="margin-top:2rem;margin-bottom:.5rem">Is Span Chain relevant for EU AI Act compliance?</h3>
-    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Yes. EU AI Act Article 12 requires strict audit trail documentation for high-risk AI systems (Annex III applies from 2. 12. 2027). Span Chain's append-only, cryptographically verifiable ledger is designed to support EU AI Act Article 12 traceability requirements.</p>
-
-    <h3 style="margin-top:2rem;margin-bottom:.5rem">What is the performance baseline for Span Chain?</h3>
-    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Span Chain is built on Elixir/OTP, isolating every agent session into its own BEAM process. The system is benchmarked at 571 spans/second with 1,000 concurrent agents, achieving 0 corrupted chains and perfect integrity during the 10,000-span stress tests.</p>
+    <h3 style="margin-top:2rem;margin-bottom:.5rem">What is the GF-872 field report?</h3>
+    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">A self-hosted OTP stress test recorded 10,000 spans across 1,000 concurrent agents at 571 spans/second with 0 corrupted sampled chains. It is a lab field report, not a product guarantee.</p>
 
     <h3 style="margin-top:2rem;margin-bottom:.5rem">What programming languages does the Span Chain SDK support?</h3>
-    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Span Chain provides official SDKs for Python (3.11+) and TypeScript/Node.js (18+). Because the ingestion layer is built on the OTLP/HTTP JSON standard, any language with an OpenTelemetry exporter can write to the ledger.</p>
+    <p style="line-height:1.6;margin-bottom:1rem;max-width:68ch;color:var(--ink-2)">Span Chain provides SDKs for Python (3.11+) and TypeScript/Node.js (18+). Span Chain supports an OTLP/HTTP JSON subset.</p>
   </div>
 </section>
 
@@ -1226,7 +1198,7 @@ docker compose up</pre>
           <a class="brand" href="/" aria-label="GhostFactory">
             <img src="Ghostfactory_brand/assets/umbrella/lockup-horizontal-reverse.svg" alt="GhostFactory" height="32">
           </a>
-          <p>Span Chain is the first product from GhostFactory — cryptographic infrastructure for production AI agents. Every agent leaves a record. We keep it.</p>
+          <p>MIT. Self-hosted. A GhostFactory product.</p>
         </div>
         <div class="foot-col">
           <h5>Span Chain</h5>

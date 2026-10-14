@@ -1,36 +1,32 @@
 <p align="center">
-  <img src=".github/assets/banner.svg" alt="Span Chain — deterministic replay for AI agents" width="900">
+  <img src=".github/assets/banner.svg" alt="Span Chain — Find where two recorded traces diverge." width="900">
 </p>
 
 <p align="center">
-  <em>Every agent leaves a record.&nbsp; We keep it.</em>
+  <em>Find where two recorded traces diverge.</em>
 </p>
 
 <p align="center">
-  <img src=".github/assets/badges.svg" alt="status · license · ingest · replay" width="620">
+  <img src=".github/assets/badges.svg" alt="status · license · ingest · playback" width="620">
 </p>
 
 <p align="center">
-  <em>Tamper-evident audit trail for production AI agents. Append-only.<br>
-  Cryptographically verifiable. Deterministically replayable.</em>
+  <em>Span Chain is a self-hosted trace recorder and structural regression-diff layer for AI agents.</em>
 </p>
 
 ---
 
-Span Chain treats the **agent session** as the unit of analysis — not the individual LLM call.
-The entire run, with its parent/child span hierarchy intact, is recorded to an
-**immutable, hash-chain–verified ledger** as the source of truth.
+**Span Chain supports an OTLP/HTTP JSON subset.**
 
-Replay a recorded session and its spans are **re-ingested into a new, independently
-verified chain** — identical structure, fresh `run_id`, no LLM re-execution. Replay
-validates Span Chain's integrity, not your agent's behavior.
-Silent failures — HTTP 200, wrong answer — become inspectable instead of irreproducible.
+**Compare agent configuration — structure and config.**
 
-Every agent action produces a **cryptographic receipt** — a tamper-evident record
-SHA-256 chained to the previous action. Append-only. Offline verification via
-`verify_ledger` — no LLM calls or external services required. Prove a specific
-artifact existed unchanged at a point in time by its SHA-256 hash via
-`POST /api/verify` (returns `{found, verified, chain_position, proof}`).
+**Trace playback / cassette re-ingest. Not agent replay.**
+
+**Tamper-evident after ingest.**
+
+Span Chain stores received spans in a SHA-256 hash chain. Re-verification can detect edits, reordering, and gaps in the middle of that stored history. It cannot detect spans that were never received, spans removed from the end, or a chain rebuilt by the server operator.
+
+MIT. Self-hosted. A GhostFactory product.
 
 ---
 
@@ -38,54 +34,43 @@ artifact existed unchanged at a point in time by its SHA-256 hash via
 
 | | LangSmith / Langfuse | Span Chain |
 |---|---|---|
-| **Purpose** | Developer debug, visualization | Production auditability, integrity |
-| **Traces** | Mutable, vendor-controlled | Append-only, hash-chained |
-| **Replay** | Re-runs LLM ($) | Cassette replay ($0) |
-| **Evidence** | Logs | Cryptographic verification |
+| **Purpose** | Developer debug, visualization | Trace recorder + structural regression-diff |
+| **Traces** | Mutable, vendor-controlled | SHA-256 hash chain of received spans |
+| **Playback** | Re-runs the agent / LLM | Trace playback / cassette re-ingest. Not agent replay. |
+| **Integrity** | Logs | Tamper-evident after ingest |
 | **Hosting** | Vendor SaaS | Self-hosted, MIT |
-| **Debug cost** | Every retry = LLM call | $0 from cassette replay |
 | **Architecture** | Stateless Python API | Elixir/OTP per-run isolation |
 
 **LangSmith** is built for development debugging and trace visualization.
-**Span Chain** is built for production auditability and tamper-evident evidence.
+**Span Chain** is a self-hosted trace recorder and structural regression-diff layer for AI agents.
 
 **Langfuse** is built for tracing and analytics.
-**Span Chain** is built for cryptographic verification and deterministic
-replay without LLM calls.
+**Span Chain** records received spans and compares agent configuration — structure and config.
 
-**Elixir/OTP per-run isolation** — each agent run gets its own supervised process;
-a crash in one run never affects another.
-
-If you are targeting EU AI Act compliance, Span Chain's tamper-evident
-ledger provides the tamper-evident audit trail that makes Article 12 traceability verifiable.
-
-**Audit trail for compliance programs:** designed to support EU AI Act Article 12
-traceability, SOC 2 audit-trail controls, and HIPAA audit-logging requirements.
-Span Chain provides the evidence layer — your compliance program provides the rest.
-
-> They show you what happened. We keep the proof.
+**Elixir/OTP per-run isolation** — each recorded run gets its own supervised process;
+a crash in one run does not take down another.
 
 ---
 
 ## How it works
 
 <p align="center">
-  <img src=".github/assets/hash-chain.svg" alt="Hash-chain ledger" width="700">
+  <img src=".github/assets/hash-chain.svg" alt="SHA-256 hash chain of received spans" width="700">
 </p>
 
-Each entry in the ledger contains a SHA-256 hash of the previous entry.
-Tampered records and dropped epochs are **detectable**, not assumed away.
+Each stored entry contains a SHA-256 hash of the previous entry.
+Re-verification can detect edits, reordering, and gaps in the middle of that stored history.
 
 ---
 
 ## See it in action
 
 <p align="center">
-  <img src=".github/assets/spanchain-trail-evidence.png" alt="Span Chain Trail — hash-verified span tree with the agent's reasoning inline" width="860">
+  <img src=".github/assets/spanchain-trail-evidence.png" alt="Span Chain Trail — span tree with the agent's reasoning inline" width="860">
 </p>
 
 <p align="center">
-  <sub>The <b>Trail</b> — a run's full span tree, every entry hash-chain verified, with the agent's own reasoning captured inline.</sub>
+  <sub>The <b>Trail</b> — a run's span tree, with the agent's own reasoning captured inline.</sub>
 </p>
 
 <p align="center">
@@ -93,7 +78,7 @@ Tampered records and dropped epochs are **detectable**, not assumed away.
 </p>
 
 <p align="center">
-  <sub><b>Evals compare</b> — a structural span-tree diff pinpoints the exact span where two runs diverge.</sub>
+  <sub><b>Evals compare</b> — Find where two recorded traces diverge.</sub>
 </p>
 
 ---
@@ -104,24 +89,18 @@ Tampered records and dropped epochs are **detectable**, not assumed away.
   <tr>
     <td align="center" width="260">
       <img src=".github/assets/stamp-verified.svg" width="110"><br>
-      <b>Verified</b><br>
-      <sub>Every entry cryptographically linked to the last</sub>
+      <b>Hash-linked</b><br>
+      <sub>Each received span is SHA-256 linked to the last</sub>
     </td>
     <td align="center" width="260">
       <img src=".github/assets/stamp-deterministic.svg" width="125"><br>
-      <b>Deterministic Replay</b><br>
-      <sub>Same session → identical chain, always</sub>
+      <b>Trace playback</b><br>
+      <sub>Trace playback / cassette re-ingest. Not agent replay.</sub>
     </td>
     <td align="center" width="260">
       <img src=".github/assets/stamp-tamper.svg" width="115"><br>
-      <b>Tamper Detection</b><br>
-      <sub>Dropped epochs and mutations surface automatically</sub>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="3" align="center">
-      <b>Non-repudiation</b><br>
-      <sub>Cryptographic proof that an agent action occurred and was not modified</sub>
+      <b>Tamper-evident after ingest</b><br>
+      <sub>Mid-history edits, reordering, and gaps are detectable</sub>
     </td>
   </tr>
 </table>
@@ -135,12 +114,12 @@ Tampered records and dropped epochs are **detectable**, not assumed away.
 </p>
 
 ```
-SDK (OTLP / JSON)
+SDK (OTLP/HTTP JSON subset)
   → Ingest  (normalize, span tree)
-    → Hash-Chain Ledger  (source of truth · immutable · verifiable)
-      ├── Deterministic Replay
-      ├── Evals & Compare
-      └── Audit Trail
+    → Hash-Chain Ledger  (received spans)
+      ├── Trace playback / cassette re-ingest
+      ├── Compare (structure and config)
+      └── Stored history
 ```
 
 ---
@@ -159,7 +138,7 @@ docker compose up
 
 UI at **http://localhost** · Ingest API at **http://localhost/ingest**
 
-**Send a trace (OTLP/HTTP JSON):**
+**Send a trace (OTLP/HTTP JSON subset):**
 
 ```bash
 curl -X POST https://localhost/v1/traces --insecure \
@@ -173,32 +152,31 @@ curl -X POST https://localhost/v1/traces --insecure \
 
 Or use the plain JSON endpoint at `http://localhost/ingest` — no OTLP SDK required.
 
-Works natively with **LangChain, CrewAI, LlamaIndex, AutoGen, and Pydantic AI**
-via standard OpenTelemetry (OTLP) — no framework-specific SDK required.
+Works with **LangChain, CrewAI, LlamaIndex, AutoGen, and Pydantic AI**
+via an OTLP/HTTP JSON subset — no framework-specific SDK required.
 
 ---
 
 ## OTLP Compatibility
 
-Span Chain ingestuje **OTLP/HTTP JSON** (`POST /v1/traces`) — subset standardu.
-Full OTel drop-in compatibility není cílem L2; chybějící pole jsou ignorována
-beze stopy (`lossy-but-visible` per ADR-004).
+Span Chain supports an OTLP/HTTP JSON subset (`POST /v1/traces`).
+Missing fields are ignored without being stored (`lossy-but-visible` per ADR-004).
 
 ### Attribute value types
 
-| OTLP type     | Span Chain chování              |
+| OTLP type     | Span Chain behavior             |
 |---------------|---------------------------------|
-| `stringValue` | uložen jako string ✅           |
-| `intValue`    | uložen jako integer ✅          |
-| `boolValue`   | uložen jako boolean ✅          |
-| `doubleValue` | uložen jako float ✅            |
-| `arrayValue`  | JSON-stringified string ⚠️     |
-| `kvlistValue` | JSON-stringified string ⚠️     |
+| `stringValue` | stored as string                |
+| `intValue`    | stored as integer               |
+| `boolValue`   | stored as boolean               |
+| `doubleValue` | stored as float                 |
+| `arrayValue`  | JSON-stringified string         |
+| `kvlistValue` | JSON-stringified string         |
 
 ### Required resource attribute
 
-`service.instance.id` **musí** být přítomno — mapuje se na `run_id`.
-Chybějící → HTTP 400 `missing_run_id`.
+`service.instance.id` **must** be present — it maps to `run_id`.
+Missing → HTTP 400 `missing_run_id`.
 
 ```json
 {
@@ -214,25 +192,25 @@ Chybějící → HTTP 400 `missing_run_id`.
 }
 ```
 
-### Co se ignoruje
+### What is ignored
 
-- `events`, `links` — neuloženy
-- scope attributes — neuloženy (pouze resource + span attributes)
-- `traceState`, `droppedAttributesCount` — neuloženy
+- `events`, `links` — not stored
+- scope attributes — not stored (resource + span attributes only)
+- `traceState`, `droppedAttributesCount` — not stored
 
 ### HTTP response
 
-Úspěšný ingest → HTTP **200** + `{"partialSuccess":{"rejectedSpans":0}}`.
-(Ne 202 — to vrací jen `/ingest` endpoint.)
+Successful ingest → HTTP **200** + `{"partialSuccess":{"rejectedSpans":0}}`.
+(Not 202 — that status is returned only by the `/ingest` endpoint.)
 
 ### OTel Collector bridge
 
-Máš standardní OTel SDK bez možnosti nastavit `service.instance.id`?
-Použij OTel Collector jako mezičlánek:
+Have a standard OTel SDK that cannot set `service.instance.id`?
+Use an OTel Collector as a bridge:
 
 ```yaml
 # OTel Collector bridge → Span Chain
-# Mapuje service.name → service.instance.id (run_id carrier pro Span Chain)
+# Maps service.name → service.instance.id (run_id carrier for Span Chain)
 receivers:
   otlp:
     protocols:
@@ -264,7 +242,7 @@ service:
 
 ## SDKs
 
-Both SDKs ship in this repo and speak OTLP/HTTP JSON (subset — see [OTLP Compatibility](#otlp-compatibility)).
+Both SDKs ship in this repo and speak an OTLP/HTTP JSON subset — see [OTLP Compatibility](#otlp-compatibility).
 
 **Python:**
 
@@ -285,9 +263,9 @@ Usage examples in [`sdk/python/README.md`](sdk/python/README.md) and
 
 ## Status
 
-v0.x · launched June 2026 · active development.
+v0.61.0 · launched June 2026 · active development.
 
-A **[GhostFactory](https://ghostfactory.art)** product — [spanchain.art](https://spanchain.art)
+A **[GhostFactory](https://ghostfactory.art)** product — [spanchain.dev](https://www.spanchain.dev/)
 
 ---
 
